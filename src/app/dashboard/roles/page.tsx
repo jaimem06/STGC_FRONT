@@ -9,9 +9,9 @@ import {
   Edit3, 
   CheckSquare, 
   Square,
-  Loader2,
   AlertTriangle
 } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 interface Permission {
   id: string;
@@ -100,7 +100,7 @@ export default function RolesPage() {
     setIsModalOpen(true);
   };
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-marine-green" size={40} /></div>;
+  if (loading) return <div className="flex justify-center py-24"><LoadingSpinner size={52} /></div>;
 
   return (
     <div className="space-y-6">

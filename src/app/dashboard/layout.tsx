@@ -4,15 +4,16 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "./components/Sidebar";
 import { useAuthStore } from "@/store/authStore";
-import { api } from "@/lib/api";
-import { Loader2 } from "lucide-react";
+import { useUIStore } from "@/store/uiStore";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, setAuth, logout } = useAuthStore();
+  const { user, logout } = useAuthStore();
+  const { isSidebarCollapsed } = useUIStore();
   const [loading, setLoading] = useState(!user);
   const router = useRouter();
 
@@ -36,24 +37,27 @@ export default function DashboardLayout({
     };
 
     checkAuth();
-  }, [user, router, setAuth, logout]);
+  }, [user, router, logout]);
 
   if (loading) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-barium-yellow">
-        <Loader2 className="animate-spin text-marine-green" size={48} />
+      <div className="h-screen w-full flex items-center justify-center bg-surface">
+        <LoadingSpinner size={52} />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-container-lowest">
       <Sidebar />
-      <main className="flex-1 p-8 overflow-y-auto">
-        <div className="max-w-7xl mx-auto">
-          {children}
-        </div>
-      </main>
+      {/* Main Content Area - Adapts to sidebar collapse state */}
+      <div className={`transition-all duration-300 ease-in-out ${isSidebarCollapsed ? "md:pl-20" : "md:pl-64"}`}>
+        <main className="min-h-screen pt-16 p-4 md:pt-8 md:p-8">
+          <div className="max-w-7xl mx-auto">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

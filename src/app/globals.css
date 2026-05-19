@@ -7,18 +7,72 @@
   --color-sepia-e37: #d4a369;
   --color-leather: #b17036;
 
+  /* Stitch Design System: The Terroir Editorial */
+  --color-primary: #442a22;
+  --color-primary-container: #5d4037;
+  --color-on-primary: #ffffff;
+  --color-secondary: #3a6843;
+  --color-secondary-container: #b9ecbd;
+  --color-on-secondary: #ffffff;
+  --color-tertiary: #412d11;
+  --color-tertiary-container: #594325;
+  --color-on-tertiary: #ffffff;
+  --color-surface: #fff8f3;
+  --color-surface-bright: #fff8f3;
+  --color-surface-container: #f6ece1;
+  --color-surface-container-low: #fcf2e7;
+  --color-surface-container-high: #f1e7dc;
+  --color-surface-container-highest: #ebe1d6;
+  --color-surface-container-lowest: #ffffff;
+  --color-on-surface: #1f1b14;
+  --color-on-surface-variant: #504441;
+  --color-outline: #827470;
+  --color-outline-variant: #d4c3be;
+  --color-inverse-surface: #353028;
+  --color-inverse-on-surface: #f9efe4;
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+
+  --font-headline: var(--font-manrope);
+  --font-display: var(--font-manrope);
+  --font-body: var(--font-public-sans);
+  --font-label: var(--font-public-sans);
+
   /* Overriding defaults if needed */
-  --color-background: var(--color-barium-yellow);
-  --color-foreground: var(--color-deep-green);
+  --color-background: var(--color-surface);
+  --color-foreground: var(--color-on-surface);
 }
 
 :root {
-  --background: #fefae3;
-  --foreground: #2b361c;
+  --background: #fff8f3;
+  --foreground: #1f1b14;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-public-sans);
 }
+
+/* Custom Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s cubic-bezier(0.21, 0.6, 0.35, 1) forwards;
+}
+
+.stagger-1 { animation-delay: 0.1s; opacity: 0; }
+.stagger-2 { animation-delay: 0.2s; opacity: 0; }
+.stagger-3 { animation-delay: 0.3s; opacity: 0; }
+.stagger-4 { animation-delay: 0.4s; opacity: 0; }
+.stagger-5 { animation-delay: 0.5s; opacity: 0; }

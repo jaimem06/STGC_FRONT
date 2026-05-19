@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { Lock, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Lock, CheckCircle2, AlertCircle } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { Suspense } from "react";
 
 function ResetPasswordForm() {
@@ -121,7 +122,7 @@ function ResetPasswordForm() {
             className="w-full bg-marine-green hover:bg-deep-green text-barium-yellow font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
             {loading ? (
-              <Loader2 className="animate-spin" size={20} />
+              <LoadingSpinner size={24} />
             ) : (
               "REABLECER CONTRASEÑA"
             )}
@@ -135,7 +136,7 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen bg-barium-yellow flex items-center justify-center p-4">
-      <Suspense fallback={<Loader2 className="animate-spin text-marine-green" size={48} />}>
+      <Suspense fallback={<LoadingSpinner size={64} />}>
         <ResetPasswordForm />
       </Suspense>
     </div>

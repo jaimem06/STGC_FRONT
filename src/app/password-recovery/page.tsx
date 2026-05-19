@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { Mail, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
+import { Mail, ArrowLeft, CheckCircle2 } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 export default function RecoveryPage() {
   const [email, setEmail] = useState("");
@@ -90,7 +91,7 @@ export default function RecoveryPage() {
               className="w-full bg-marine-green hover:bg-deep-green text-barium-yellow font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               {loading ? (
-                <Loader2 className="animate-spin" size={20} />
+                <LoadingSpinner size={24} />
               ) : (
                 "ENVIAR ENLACE"
               )}

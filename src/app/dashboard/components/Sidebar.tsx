@@ -9,9 +9,13 @@ import {
   LogOut, 
   Coffee, 
   LayoutDashboard,
-  Key
+  Key,
+  ChevronLeft,
+  Menu,
+  User as UserIcon
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
+import { useUIStore } from "@/store/uiStore";
 
 const menuItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -24,56 +28,153 @@ const menuItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
+  
+  const { 
+    isSidebarCollapsed, 
+    toggleSidebar, 
+    isMobileSidebarOpen, 
+    setMobileSidebarOpen 
+  } = useUIStore();
 
   return (
-    <aside className="w-64 bg-deep-green text-barium-yellow flex flex-col h-screen sticky top-0 shadow-2xl">
-      <div className="p-6 border-b border-marine-green flex items-center gap-3">
-        <div className="bg-marine-green p-2 rounded-lg">
-          <Coffee size={24} />
-        </div>
-        <div>
-          <h1 className="font-bold text-lg leading-none">STGC</h1>
-          <p className="text-[10px] opacity-60 tracking-widest mt-1 uppercase">Tierra Fértil</p>
-        </div>
-      </div>
+    <>
+      {/* Mobile Menu Trigger */}
+      <button 
+        onClick={() => setMobileSidebarOpen(true)}
+        className="fixed top-4 left-4 z-[60] p-2 rounded-lg bg-primary text-on-primary md:hidden shadow-lg"
+      >
+        <Menu size={20} />
+      </button>
 
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {menuItems.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
-                isActive 
-                  ? "bg-marine-green text-white shadow-lg" 
-                  : "hover:bg-marine-green/20 text-barium-yellow/70 hover:text-barium-yellow"
+      {/* Backdrop for mobile */}
+      {isMobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-[50] md:hidden backdrop-blur-sm"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
+      <aside 
+        className={`fixed inset-y-0 left-0 z-[55] bg-surface/80 backdrop-blur-xl border-r border-outline-variant/10 shadow-[8px_0_24px_rgba(31,27,20,0.06)] flex flex-col justify-between py-6 transition-all duration-300 ease-in-out ${
+          isSidebarCollapsed ? "w-20" : "w-64"
+        } ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+      >
+        {/* Header / Brand */}
+        <div className="px-4 mb-10 flex items-center justify-between">
+          <div 
+            className={`flex items-center gap-3 transition-all duration-300 ${isSidebarCollapsed ? "px-0" : "px-2"}`}
+            onClick={() => isSidebarCollapsed && toggleSidebar()}
+          >
+            <div className="w-10 h-10 shrink-0 rounded-xl bg-primary-container flex items-center justify-center text-on-primary shadow-sm">
+              <Coffee size={24} />
+            </div>
+            {!isSidebarCollapsed && (
+              <div className="flex flex-col whitespace-nowrap overflow-hidden animate-fade-in-up">
+                <span className="font-headline text-xl font-extrabold text-primary leading-none tracking-tighter">STGC</span>
+                <span className="font-label text-[10px] tracking-[0.2em] text-outline uppercase">TIERRA FÉRTIL</span>
+              </div>
+            )}
+          </div>
+          
+          <button 
+            onClick={toggleSidebar}
+            className="hidden md:flex items-center justify-center w-8 h-8 rounded-full hover:bg-surface-container-high transition-all text-primary"
+          >
+            <ChevronLeft 
+              size={18} 
+              className={`transition-transform duration-300 ${isSidebarCollapsed ? "rotate-180" : ""}`} 
+            />
+          </button>
+        </div>
+
+        {/* Navigation Links */}
+        <nav className="flex-grow overflow-y-auto px-3 space-y-1 custom-scrollbar">
+          {menuItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                onClick={() => setMobileSidebarOpen(false)}
+                className={`flex items-center gap-4 py-3 transition-all duration-300 rounded-xl group relative ${
+                  isActive 
+                    ? "bg-primary text-on-primary shadow-md" 
+                    : "text-on-surface-variant hover:bg-surface-container-highest hover:text-primary"
+                } ${isSidebarCollapsed ? "justify-center px-0" : "px-4"}`}
+                title={isSidebarCollapsed ? item.name : ""}
+              >
+                <item.icon 
+                  size={20} 
+                  className={`shrink-0 transition-all duration-300 ${
+                    !isActive && "group-hover:text-primary group-hover:scale-110"
+                  }`} 
+                />
+                {!isSidebarCollapsed && (
+                  <span className="font-label text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-300">
+                    {item.name}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Footer Section */}
+        <div className={`px-4 mt-auto space-y-4 transition-all duration-300 ${isSidebarCollapsed ? "items-center" : ""}`}>
+          {/* User Status Card */}
+          <div 
+            className={`bg-secondary transition-all duration-300 group hover:bg-secondary/90 cursor-pointer overflow-hidden flex items-center ${
+              isSidebarCollapsed 
+                ? "justify-center w-12 h-12 rounded-xl mx-auto" 
+                : "justify-between w-full p-3 rounded-2xl"
+            }`}
+          >
+            <div className={`flex items-center min-w-0 ${isSidebarCollapsed ? "justify-center" : "gap-3"}`}>
+              <div className="w-8 h-8 shrink-0 rounded-full bg-surface-container-highest flex items-center justify-center transition-transform duration-300 group-hover:scale-110 shadow-sm">
+                <UserIcon size={16} className="text-primary" />
+              </div>
+              {!isSidebarCollapsed && (
+                <span className="font-label text-xs font-semibold text-on-secondary truncate">
+                  {user?.role?.name || "SIN ROL"}
+                </span>
+              )}
+            </div>
+            {!isSidebarCollapsed && (
+               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            )}
+          </div>
+
+          {/* Profile & Logout */}
+          <div className="flex flex-col gap-2 pt-4 border-t border-outline-variant/30">
+            <div className={`flex items-center gap-4 ${isSidebarCollapsed ? "justify-center" : "px-2"}`}>
+              <div className="w-10 h-10 shrink-0 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold font-headline text-lg shadow-sm transition-transform duration-300 hover:scale-105 border-2 border-surface-container">
+                {user?.email?.charAt(0).toUpperCase() || "U"}
+              </div>
+              {!isSidebarCollapsed && (
+                <div className="flex flex-col min-w-0 overflow-hidden animate-fade-in-up">
+                  <span className="font-label text-xs font-bold text-primary truncate">
+                    {user?.email?.split('@')[0] || "Usuario"}
+                  </span>
+                  <span className="text-[10px] text-outline truncate">{user?.email || "email@finca.com"}</span>
+                </div>
+              )}
+            </div>
+            
+            <button 
+              onClick={logout}
+              className={`flex items-center gap-4 w-full py-3 text-on-surface-variant hover:text-on-error-container hover:bg-error-container transition-all duration-300 rounded-xl active:scale-[0.98] ${
+                isSidebarCollapsed ? "justify-center px-0" : "px-3"
               }`}
+              title={isSidebarCollapsed ? "Cerrar Sesión" : ""}
             >
-              <item.icon size={20} className={isActive ? "text-white" : "group-hover:scale-110 transition-transform"} />
-              <span className="font-medium">{item.name}</span>
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="p-4 border-t border-marine-green">
-        <div className="bg-marine-green/20 p-4 rounded-2xl mb-4">
-          <p className="text-xs opacity-50 mb-1">Usuario</p>
-          <p className="font-semibold truncate">{user?.email || "Cargando..."}</p>
-          <p className="text-[10px] bg-sepia-e37/20 text-sepia-e37 inline-block px-2 py-0.5 rounded mt-2 font-bold">
-            {user?.role?.name || "SIN ROL"}
-          </p>
+              <LogOut size={20} className="shrink-0" />
+              {!isSidebarCollapsed && (
+                <span className="font-label text-sm font-bold">Cerrar Sesión</span>
+              )}
+            </button>
+          </div>
         </div>
-        
-        <button
-          onClick={logout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 transition-all font-semibold"
-        >
-          <LogOut size={20} />
-          Cerrar Sesión
-        </button>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }

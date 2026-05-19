@@ -4,16 +4,15 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { 
   UserPlus, 
-  MoreVertical, 
   Shield, 
-  Mail, 
   Calendar,
   AlertCircle,
   CheckCircle2,
   Clock,
   Ban,
-  Loader2
+  ChevronDown
 } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 interface Permission {
   name: string;
@@ -33,10 +32,10 @@ interface User {
 }
 
 const statusStyles = {
-  ACTIVO: "bg-green-100 text-green-700 border-green-200",
-  INACTIVO: "bg-gray-100 text-gray-700 border-gray-200",
-  SUSPENDIDO: "bg-red-100 text-red-700 border-red-200",
-  PENDIENTE: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  ACTIVO: "bg-green-50 text-green-700 border-green-200/50",
+  INACTIVO: "bg-surface-container text-on-surface-variant border-outline-variant/30",
+  SUSPENDIDO: "bg-error-container/20 text-error border-error/20",
+  PENDIENTE: "bg-amber-50 text-amber-700 border-amber-200/50",
 };
 
 const statusIcons = {
@@ -76,109 +75,125 @@ export default function UsersPage() {
       await api.patch(`/users/${userId}`, data);
       fetchData(); // Recargar lista
     } catch (err) {
-      alert("Error al actualizar el usuario");
+      console.error("Error updating user:", err);
     }
   };
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-marine-green" size={40} /></div>;
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center py-24 space-y-4 animate-fade-in-up">
+      <LoadingSpinner size={52} />
+      <p className="font-label text-xs font-bold text-outline uppercase tracking-widest">Sincronizando Usuarios</p>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 animate-fade-in-up">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-deep-green">Gestión de Usuarios</h1>
-          <p className="text-gray-500">Administra el personal y sus niveles de acceso</p>
+          <h1 className="font-headline text-3xl font-extrabold text-primary tracking-tight">Gestión de Usuarios</h1>
+          <p className="font-body text-on-surface-variant mt-1">Administra el personal y sus niveles de acceso en la plataforma.</p>
         </div>
-        <button className="bg-marine-green text-barium-yellow px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-deep-green transition-all shadow-md">
+        <button className="bg-primary text-on-primary px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:shadow-xl hover:shadow-primary/20 hover:-translate-y-0.5 transition-all active:scale-[0.98]">
           <UserPlus size={20} /> NUEVO USUARIO
         </button>
       </div>
 
       {error ? (
-        <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-2xl flex gap-4 items-center">
+        <div className="bg-error-container/10 border border-error/20 text-error p-8 rounded-[32px] flex gap-4 items-center">
           <AlertCircle size={32} />
-          <p className="font-medium">{error}</p>
+          <p className="font-body font-medium">{error}</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Usuario</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Rol</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {users.map((user) => {
-                const StatusIcon = statusIcons[user.status];
-                return (
-                  <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-barium-yellow rounded-full flex items-center justify-center text-deep-green font-bold border border-marine-green/20">
-                          {user.email[0].toUpperCase()}
+        <div className="bg-white rounded-[32px] shadow-sm border border-outline-variant/10 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-surface/50 border-b border-outline-variant/10">
+                  <th className="px-8 py-5 text-[10px] font-bold text-outline uppercase tracking-[0.2em]">Usuario</th>
+                  <th className="px-8 py-5 text-[10px] font-bold text-outline uppercase tracking-[0.2em]">Rol</th>
+                  <th className="px-8 py-5 text-[10px] font-bold text-outline uppercase tracking-[0.2em]">Estado</th>
+                  <th className="px-8 py-5 text-[10px] font-bold text-outline uppercase tracking-[0.2em] text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/5">
+                {users.map((user) => {
+                  const StatusIcon = statusIcons[user.status];
+                  return (
+                    <tr key={user.id} className="hover:bg-surface/30 transition-colors group">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-primary-container text-on-primary rounded-2xl flex items-center justify-center font-headline font-bold text-xl shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
+                            {user.email[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-label text-sm font-bold text-primary">{user.email}</p>
+                            <p className="text-[10px] text-outline flex items-center gap-1 mt-0.5 font-medium">
+                              <Calendar size={12} className="text-secondary" /> Miembro desde May 2026
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold text-deep-green">{user.email}</p>
-                          <p className="text-xs text-gray-400 flex items-center gap-1">
-                            <Calendar size={12} /> Miembro desde May 2026
-                          </p>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-sm font-bold flex items-center gap-2 text-primary">
+                            <Shield size={14} className="text-secondary" />
+                            {user.role.name}
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {user.role.permissions.slice(0, 2).map(p => (
+                              <span key={p.name} className="text-[9px] bg-surface-container px-2 py-0.5 rounded-lg text-on-surface-variant font-bold uppercase tracking-wider">
+                                {p.name}
+                              </span>
+                            ))}
+                            {user.role.permissions.length > 2 && (
+                              <span className="text-[9px] text-outline font-bold">+{user.role.permissions.length - 2}</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-sm font-medium flex items-center gap-2 text-deep-green">
-                          <Shield size={14} className="text-marine-green" />
-                          {user.role.name}
+                      </td>
+                      <td className="px-8 py-6">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] font-extrabold border uppercase tracking-widest ${statusStyles[user.status]}`}>
+                          <StatusIcon size={12} />
+                          {user.status}
                         </span>
-                        <div className="flex flex-wrap gap-1">
-                          {user.role.permissions.slice(0, 2).map(p => (
-                            <span key={p.name} className="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500 lowercase">
-                              {p.name}
-                            </span>
-                          ))}
-                          {user.role.permissions.length > 2 && (
-                            <span className="text-[10px] text-gray-400">+{user.role.permissions.length - 2}</span>
-                          )}
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                        <div className="flex items-center justify-end gap-3">
+                          <div className="relative group/select">
+                            <select 
+                              className="appearance-none bg-surface/50 border border-outline-variant/20 rounded-xl px-4 py-2 pr-8 text-[10px] font-bold text-primary outline-none focus:ring-2 focus:ring-secondary/20 transition-all cursor-pointer uppercase tracking-wider"
+                              onChange={(e) => updateUser(user.id, { role_name: e.target.value })}
+                              defaultValue={user.role.name}
+                            >
+                              {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                            </select>
+                            <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-outline" />
+                          </div>
+                          <div className="relative group/select">
+                            <select 
+                              className="appearance-none bg-surface/50 border border-outline-variant/20 rounded-xl px-4 py-2 pr-8 text-[10px] font-bold text-primary outline-none focus:ring-2 focus:ring-secondary/20 transition-all cursor-pointer uppercase tracking-wider"
+                              onChange={(e) => updateUser(user.id, { status: e.target.value })}
+                              defaultValue={user.status}
+                            >
+                              <option value="ACTIVO">Activo</option>
+                              <option value="INACTIVO">Inactivo</option>
+                              <option value="SUSPENDIDO">Suspendido</option>
+                              <option value="PENDIENTE">Pendiente</option>
+                            </select>
+                            <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-outline" />
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${statusStyles[user.status]}`}>
-                        <StatusIcon size={14} />
-                        {user.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <select 
-                        className="text-xs border rounded p-1 mr-2 outline-none focus:ring-1 focus:ring-marine-green"
-                        onChange={(e) => updateUser(user.id, { role_name: e.target.value })}
-                        defaultValue={user.role.name}
-                      >
-                        {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
-                      </select>
-                      <select 
-                        className="text-xs border rounded p-1 outline-none focus:ring-1 focus:ring-marine-green"
-                        onChange={(e) => updateUser(user.id, { status: e.target.value })}
-                        defaultValue={user.status}
-                      >
-                        <option value="ACTIVO">Activo</option>
-                        <option value="INACTIVO">Inactivo</option>
-                        <option value="SUSPENDIDO">Suspendido</option>
-                        <option value="PENDIENTE">Pendiente</option>
-                      </select>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
           {users.length === 0 && !error && (
-            <div className="py-20 text-center">
-              <p className="text-gray-500">No hay usuarios registrados.</p>
+            <div className="py-24 text-center space-y-2">
+              <LoadingSpinner size={48} className="mx-auto opacity-20" />
+              <p className="font-label text-xs font-bold text-outline uppercase tracking-widest">No hay usuarios registrados</p>
             </div>
           )}
         </div>
