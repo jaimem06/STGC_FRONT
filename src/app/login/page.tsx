@@ -6,6 +6,8 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { toast } from "sonner";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import CompactInput from "@/components/CompactInput";
+import { Mail, Lock } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -26,7 +28,11 @@ export default function LoginPage() {
       
       setAuth(user, access_token);
       toast.success("¡Bienvenido de nuevo!");
-      router.push("/dashboard/users");
+      
+      // Pequeño retraso para asegurar que el estado se persista en móviles antes de navegar
+      setTimeout(() => {
+        router.push("/dashboard/users");
+      }, 500);
     } catch (err: any) {
       console.error("Error capturado en login:", err);
       const status = err.response?.status;
@@ -68,7 +74,7 @@ export default function LoginPage() {
           {/* Branding Overlay for Mobile */}
           <div className="absolute top-0 left-0 w-full p-8 md:hidden bg-gradient-to-b from-black/40 to-transparent">
             <h1 className="font-headline text-2xl font-extrabold text-white tracking-[0.2em] uppercase animate-fade-in-up">
-              The Terroir <span className="font-light">Editorial</span>
+              Tierra Fértil <span className="font-light">Sistema STGC</span>
             </h1>
           </div>
         </div>
@@ -95,48 +101,26 @@ export default function LoginPage() {
           {/* Login Form */}
           <form onSubmit={handleLogin} className="space-y-4 max-w-sm">
             <div className="space-y-4">
-              {/* Email Input */}
-              <div className="group relative animate-fade-in-up stagger-3">
-                <label
-                  className="block font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-1 group-focus-within:text-primary transition-colors duration-300 md:text-xs"
-                  htmlFor="email"
-                >
-                  Correo Electrónico
-                </label>
-                <div className="relative transition-all duration-300 rounded-xl">
-                  <input
-                    className="w-full bg-white/40 backdrop-blur-sm border border-outline-variant rounded-xl px-4 py-2.5 text-on-surface placeholder:text-on-surface-variant/60 focus:ring-2 focus:ring-primary/20 focus:bg-white/60 focus:border-primary/30 transition-all duration-300 outline-none md:text-base"
-                    id="email"
-                    placeholder="ejemplo@terroir.com"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-              </div>
+              <CompactInput
+                label="Correo Electrónico"
+                icon={Mail}
+                type="email"
+                required
+                placeholder="ejemplo@terroir.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
 
-              {/* Password Input */}
-              <div className="group relative animate-fade-in-up stagger-4">
-                <div className="flex justify-between items-end mb-1">
-                  <label
-                    className="block font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant group-focus-within:text-primary transition-colors duration-300 md:text-xs"
-                    htmlFor="password"
-                  >
-                    Contraseña
-                  </label>
-                </div>
-                <div className="relative transition-all duration-300 rounded-xl">
-                  <input
-                    className="w-full bg-white/40 backdrop-blur-sm border border-outline-variant rounded-xl px-4 py-2.5 text-on-surface placeholder:text-on-surface-variant/60 focus:ring-2 focus:ring-primary/20 focus:bg-white/60 focus:border-primary/30 transition-all duration-300 outline-none md:text-base"
-                    id="password"
-                    placeholder="••••••••"
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
+              <div className="relative">
+                <CompactInput
+                  label="Contraseña"
+                  icon={Lock}
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
                 <div className="mt-1 text-right">
                   <button
                     type="button"

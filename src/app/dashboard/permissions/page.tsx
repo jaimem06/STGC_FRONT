@@ -10,6 +10,9 @@ import {
   Info
 } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import CompactInput from "@/components/CompactInput";
+import CompactSearch from "@/components/CompactSearch";
+import { toast } from "sonner";
 
 interface Permission {
   id: string;
@@ -46,12 +49,13 @@ export default function PermissionsPage() {
     e.preventDefault();
     try {
       await api.post("/roles/permissions", { name, description });
+      toast.success("Permiso creado con éxito");
       setName("");
       setDescription("");
       setIsCreating(false);
       fetchPermissions();
-    } catch (err) {
-      alert("Error al crear permiso");
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Error al crear permiso");
     }
   };
 
@@ -60,50 +64,50 @@ export default function PermissionsPage() {
     p.description?.toLowerCase().includes(search.toLowerCase())
   );
 
-  if (loading) return <div className="flex justify-center py-24"><LoadingSpinner size={52} /></div>;
+  if (loading) return <LoadingSpinner size={52} fullPage />;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-deep-green">Permisos del Sistema</h1>
+          <h1 className="text-2xl font-bold text-secondary">Permisos del Sistema</h1>
           <p className="text-gray-500">Acciones granulares que pueden realizar los usuarios</p>
         </div>
         <button 
           onClick={() => setIsCreating(!isCreating)}
-          className="bg-marine-green text-barium-yellow px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-deep-green transition-all shadow-md"
+          className="bg-secondary-container text-surface px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-secondary transition-all shadow-md"
         >
           <Plus size={20} /> NUEVO PERMISO
         </button>
       </div>
 
       {isCreating && (
-        <div className="bg-white rounded-2xl p-6 border-2 border-marine-green shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
-          <h3 className="text-lg font-bold text-deep-green mb-4 flex items-center gap-2">
-            <Key size={20} className="text-marine-green" /> Crear Nuevo Permiso Granular
+        <div className="bg-white rounded-2xl p-6 border-2 border-secondary-container shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
+          <h3 className="text-lg font-bold text-secondary mb-4 flex items-center gap-2">
+            <Key size={20} className="text-secondary-container" /> Crear Nuevo Permiso Granular
           </h3>
           <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input 
+            <CompactInput
+              label="Nombre del Permiso"
               required
-              className="px-4 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-marine-green"
-              placeholder="Nombre (ej: editar_post)"
+              placeholder="ej: editar_post"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <input 
-              className="px-4 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-marine-green"
+            <CompactInput
+              label="Descripción"
               placeholder="Descripción corta..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
-            <div className="flex gap-2">
-              <button type="submit" className="flex-1 bg-marine-green text-white font-bold rounded-lg hover:bg-deep-green transition-colors">
+            <div className="flex gap-2 pt-5">
+              <button type="submit" className="flex-1 bg-secondary-container text-white font-bold rounded-xl hover:bg-secondary transition-colors text-xs">
                 GUARDAR
               </button>
               <button 
                 type="button" 
                 onClick={() => setIsCreating(false)}
-                className="px-4 bg-gray-100 text-gray-500 font-bold rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 bg-gray-100 text-gray-500 font-bold rounded-xl hover:bg-gray-200 transition-colors text-xs"
               >
                 CANCELAR
               </button>
@@ -115,24 +119,20 @@ export default function PermissionsPage() {
         </div>
       )}
 
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-        <input 
-          className="w-full pl-12 pr-4 py-3 rounded-2xl border border-gray-200 shadow-sm outline-none focus:ring-2 focus:ring-marine-green transition-all"
-          placeholder="Buscar permisos por nombre o descripción..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+      <CompactSearch 
+        value={search}
+        onChange={setSearch}
+        placeholder="Buscar permisos por nombre o descripción..."
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {filteredPermissions.map((perm) => (
-          <div key={perm.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:border-marine-green transition-all group">
+          <div key={perm.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:border-secondary-container transition-all group">
             <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-barium-yellow rounded-lg text-marine-green group-hover:bg-marine-green group-hover:text-white transition-colors">
+              <div className="p-2 bg-surface rounded-lg text-secondary-container group-hover:bg-secondary-container group-hover:text-white transition-colors">
                 <CheckCircle2 size={18} />
               </div>
-              <h4 className="font-bold text-deep-green truncate" title={perm.name}>{perm.name}</h4>
+              <h4 className="font-bold text-secondary truncate" title={perm.name}>{perm.name}</h4>
             </div>
             <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">
               {perm.description || "Sin descripción proporcionada."}

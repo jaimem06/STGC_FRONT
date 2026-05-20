@@ -12,6 +12,9 @@ import {
   AlertTriangle
 } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import CompactInput from "@/components/CompactInput";
+import PremiumConfirm from "@/components/PremiumConfirm";
+import { toast } from "sonner";
 
 interface Permission {
   id: string;
@@ -33,6 +36,10 @@ export default function RolesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
 
+  // Deletion State
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
+
   // Form State
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -52,6 +59,7 @@ export default function RolesPage() {
       setPermissions(permsRes.data);
     } catch (err) {
       console.error(err);
+      toast.error("Error al cargar datos");
     } finally {
       setLoading(false);
     }
@@ -64,24 +72,35 @@ export default function RolesPage() {
     try {
       if (editingRole) {
         await api.put(`/roles/${editingRole.id}`, payload);
+        toast.success("Rol actualizado con éxito");
       } else {
         await api.post("/roles", payload);
+        toast.success("Rol creado con éxito");
       }
       setIsModalOpen(false);
       resetForm();
       fetchData();
-    } catch (err) {
-      alert("Error al guardar el rol");
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Error al guardar el rol");
     }
   };
 
   const deleteRole = async (id: string) => {
-    if (!confirm("¿Estás seguro de eliminar este rol?")) return;
+    setRoleToDelete(id);
+    setIsConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!roleToDelete) return;
     try {
-      await api.delete(`/roles/${id}`);
+      await api.delete(`/roles/${roleToDelete}`);
+      toast.info("Rol eliminado. Los usuarios afectados han sido reasignados a 'Cajero Mesero' automáticamente.");
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Error al eliminar");
+      toast.error(err.response?.data?.detail || "Error al eliminar el rol");
+    } finally {
+      setIsConfirmOpen(false);
+      setRoleToDelete(null);
     }
   };
 
@@ -100,18 +119,18 @@ export default function RolesPage() {
     setIsModalOpen(true);
   };
 
-  if (loading) return <div className="flex justify-center py-24"><LoadingSpinner size={52} /></div>;
+  if (loading) return <LoadingSpinner size={52} fullPage />;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-deep-green">Roles del Sistema</h1>
+          <h1 className="text-2xl font-bold text-secondary">Roles del Sistema</h1>
           <p className="text-gray-500">Define las jerarquías y sus permisos asociados</p>
         </div>
         <button 
           onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="bg-marine-green text-barium-yellow px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-deep-green transition-all shadow-md"
+          className="bg-secondary-container text-surface px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-secondary transition-all shadow-md"
         >
           <Plus size={20} /> NUEVO ROL
         </button>
@@ -121,11 +140,11 @@ export default function RolesPage() {
         {roles.map((role) => (
           <div key={role.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start mb-4">
-              <div className="bg-barium-yellow p-3 rounded-xl text-marine-green">
+              <div className="bg-surface p-3 rounded-xl text-secondary-container">
                 <ShieldCheck size={24} />
               </div>
               <div className="flex gap-2">
-                <button onClick={() => openEdit(role)} className="p-2 text-gray-400 hover:text-marine-green transition-colors">
+                <button onClick={() => openEdit(role)} className="p-2 text-gray-400 hover:text-secondary-container transition-colors">
                   <Edit3 size={18} />
                 </button>
                 <button onClick={() => deleteRole(role.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
@@ -134,14 +153,14 @@ export default function RolesPage() {
               </div>
             </div>
             
-            <h3 className="text-lg font-bold text-deep-green">{role.name}</h3>
+            <h3 className="text-lg font-bold text-secondary">{role.name}</h3>
             <p className="text-sm text-gray-500 mb-6 flex-1">{role.description || "Sin descripción"}</p>
             
             <div className="space-y-2">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Permisos Asignados</p>
               <div className="flex flex-wrap gap-2">
                 {role.permissions.map(p => (
-                  <span key={p.id} className="text-[10px] bg-marine-green/10 text-marine-green px-2 py-1 rounded-md font-medium">
+                  <span key={p.id} className="text-[10px] bg-secondary-container/10 text-secondary-container px-2 py-1 rounded-md font-medium">
                     {p.name}
                   </span>
                 ))}
@@ -157,35 +176,31 @@ export default function RolesPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-deep-green">{editingRole ? "Editar Rol" : "Crear Nuevo Rol"}</h2>
+              <h2 className="text-xl font-bold text-secondary">{editingRole ? "Editar Rol" : "Crear Nuevo Rol"}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
             
             <form onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-deep-green">Nombre del Rol</label>
-                  <input 
-                    required
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-marine-green"
-                    placeholder="Ej: SUPERVISOR"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-deep-green">Descripción</label>
-                  <input 
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-marine-green"
-                    placeholder="Breve descripción..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                  />
-                </div>
+                <CompactInput
+                  label="Nombre del Rol"
+                  required
+                  placeholder="Ej: SUPERVISOR"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+                <CompactInput
+                  label="Descripción"
+                  placeholder="Breve descripción..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
               </div>
 
               <div className="space-y-4">
-                <label className="text-sm font-bold text-deep-green">Asignar Permisos Granulares</label>
+                <label className="block font-label text-[9px] font-bold uppercase tracking-widest text-outline ml-1">
+                  Asignar Permisos Granulares
+                </label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {permissions.map((perm) => {
                     const isSelected = selectedPerms.includes(perm.id);
@@ -200,7 +215,7 @@ export default function RolesPage() {
                         }}
                         className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
                           isSelected 
-                            ? "bg-marine-green/10 border-marine-green text-marine-green" 
+                            ? "bg-secondary-container/10 border-secondary-container text-secondary-container" 
                             : "bg-gray-50 border-gray-100 text-gray-500 hover:border-gray-300"
                         }`}
                       >
@@ -222,7 +237,7 @@ export default function RolesPage() {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 px-4 py-3 rounded-lg bg-marine-green text-barium-yellow font-bold hover:bg-deep-green transition-colors"
+                  className="flex-1 px-4 py-3 rounded-lg bg-secondary-container text-surface font-bold hover:bg-secondary transition-colors"
                 >
                   {editingRole ? "ACTUALIZAR ROL" : "CREAR ROL"}
                 </button>
@@ -231,6 +246,16 @@ export default function RolesPage() {
           </div>
         </div>
       )}
+
+      <PremiumConfirm
+        open={isConfirmOpen}
+        onOpenChange={setIsConfirmOpen}
+        title="¿Eliminar este rol?"
+        description="Esta acción es permanente. Los usuarios que tengan este rol serán reasignados automáticamente a 'Cajero Mesero'."
+        onConfirm={handleConfirmDelete}
+        confirmText="ELIMINAR ROL"
+        variant="danger"
+      />
     </div>
   );
 }

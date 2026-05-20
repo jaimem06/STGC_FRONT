@@ -12,7 +12,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, logout } = useAuthStore();
+  const { user, logout, fetchMe } = useAuthStore();
   const { isSidebarCollapsed } = useUIStore();
   const [loading, setLoading] = useState(!user);
   const router = useRouter();
@@ -25,26 +25,19 @@ export default function DashboardLayout({
         return;
       }
 
-      if (!user) {
-        try {
-          setLoading(false);
-        } catch (error) {
-          logout();
-        }
-      } else {
+      try {
+        await fetchMe();
         setLoading(false);
+      } catch (error) {
+        logout();
       }
     };
 
     checkAuth();
-  }, [user, router, logout]);
+  }, [router, logout, fetchMe]);
 
   if (loading) {
-    return (
-      <div className="h-screen w-full flex items-center justify-center bg-surface">
-        <LoadingSpinner size={52} />
-      </div>
-    );
+    return <LoadingSpinner size={52} fullPage />;
   }
 
   return (

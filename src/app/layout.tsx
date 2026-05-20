@@ -1,7 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Manrope, Public_Sans } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "sonner";
+import PremiumToaster from "@/components/PremiumToaster";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,9 +23,21 @@ const publicSans = Public_Sans({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: "#442a22",
+};
+
 export const metadata: Metadata = {
   title: "STGC - Sistema de Trazabilidad y Gestión",
   description: "Plataforma para la gestión de trazabilidad y calidad del café",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "STGC",
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export default function RootLayout({
@@ -40,7 +52,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {children}
-        <Toaster richColors position="top-right" />
+        <PremiumToaster />
       </body>
     </html>
   );

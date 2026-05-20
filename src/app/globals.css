@@ -1,21 +1,14 @@
 @import "tailwindcss";
 
 @theme {
-  --color-marine-green: #636b3f;
-  --color-deep-green: #2b361c;
-  --color-barium-yellow: #fefae3;
-  --color-sepia-e37: #d4a369;
-  --color-leather: #b17036;
-
-  /* Stitch Design System: The Terroir Editorial */
   --color-primary: #442a22;
   --color-primary-container: #5d4037;
   --color-on-primary: #ffffff;
   --color-secondary: #3a6843;
   --color-secondary-container: #b9ecbd;
   --color-on-secondary: #ffffff;
-  --color-tertiary: #412d11;
-  --color-tertiary-container: #594325;
+  --color-tertiary: #b17036;
+  --color-tertiary-container: #d4a369;
   --color-on-tertiary: #ffffff;
   --color-surface: #fff8f3;
   --color-surface-bright: #fff8f3;

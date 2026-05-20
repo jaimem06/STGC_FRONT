@@ -16,10 +16,5 @@ export default function Home() {
     }
   }, [router]);
 
-  return (
-    <div className="h-screen w-full flex flex-col items-center justify-center bg-surface gap-4">
-      <LoadingSpinner size={52} />
-      <p className="text-primary font-bold animate-pulse">Redirigiendo a STGC Tierra Fértil...</p>
-    </div>
-  );
+  return <LoadingSpinner size={52} fullPage />;
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Lock, CheckCircle2, AlertCircle } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import { Suspense } from "react";
+import CompactInput from "@/components/CompactInput";
+import { toast } from "sonner";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -14,12 +15,11 @@ function ResetPasswordForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
   const router = useRouter();
 
   useEffect(() => {
     if (!token) {
-      setError("Token de recuperación no encontrado. Solicita uno nuevo.");
+      toast.error("Token de recuperación no encontrado. Solicita uno nuevo.");
     }
   }, [token]);
 
@@ -27,17 +27,16 @@ function ResetPasswordForm() {
     e.preventDefault();
     
     if (newPassword !== confirmPassword) {
-      setError("Las contraseñas no coinciden");
+      toast.error("Las contraseñas no coinciden");
       return;
     }
 
     if (newPassword.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres");
+      toast.error("La contraseña debe tener al menos 6 caracteres");
       return;
     }
 
     setLoading(true);
-    setError("");
 
     try {
       await api.post("/auth/reset-password", { 
@@ -45,8 +44,10 @@ function ResetPasswordForm() {
         new_password: newPassword 
       });
       setSuccess(true);
+      toast.success("¡Contraseña actualizada!");
     } catch (err: any) {
-      setError(err.response?.data?.detail || "El enlace es inválido o ha expirado");
+      const detail = err.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : "El enlace es inválido o ha expirado");
     } finally {
       setLoading(false);
     }
@@ -54,15 +55,17 @@ function ResetPasswordForm() {
 
   if (success) {
     return (
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center border-2 border-marine-green">
-        <CheckCircle2 className="mx-auto text-marine-green mb-4" size={64} />
-        <h1 className="text-2xl font-bold text-deep-green mb-2">¡Contraseña Cambiada!</h1>
-        <p className="text-gray-600 mb-8">
-          Tu contraseña ha sido actualizada exitosamente. Ahora puedes iniciar sesión con tus nuevas credenciales.
+      <div className="max-w-md w-full bg-white/50 backdrop-blur-xl rounded-[40px] shadow-2xl p-10 text-center border border-outline-variant/10 animate-fade-in-up">
+        <div className="w-16 h-16 bg-secondary/10 text-secondary rounded-full flex items-center justify-center mx-auto mb-6">
+          <CheckCircle2 size={32} />
+        </div>
+        <h1 className="font-headline text-3xl font-extrabold text-primary mb-3">¡Éxito!</h1>
+        <p className="font-body text-on-surface-variant mb-8 text-sm leading-relaxed">
+          Tu contraseña ha sido actualizada. Ahora puedes volver a entrar al sistema.
         </p>
         <button
           onClick={() => router.push("/login")}
-          className="w-full bg-marine-green hover:bg-deep-green text-barium-yellow font-bold py-3 rounded-lg transition-colors"
+          className="w-full bg-primary text-on-primary font-headline font-bold py-4 rounded-2xl shadow-xl shadow-primary/20 hover:-translate-y-0.5 transition-all active:scale-95"
         >
           IR AL LOGIN
         </button>
@@ -71,58 +74,43 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-marine-green">
-      <div className="p-8">
-        <h1 className="text-2xl font-bold text-deep-green mb-2">Nueva Contraseña</h1>
-        <p className="text-gray-600 mb-8">
-          Ingresa tu nueva contraseña para recuperar el acceso a tu cuenta.
+    <div className="max-w-md w-full bg-white/50 backdrop-blur-xl rounded-[40px] shadow-2xl border border-outline-variant/10 overflow-hidden animate-fade-in-up">
+      <div className="p-10">
+        <h1 className="font-headline text-3xl font-extrabold text-primary mb-3">Nueva Contraseña</h1>
+        <p className="font-body text-on-surface-variant mb-10 text-sm leading-relaxed">
+          Crea una clave segura para proteger tu acceso a la plataforma STGC.
         </p>
 
         <form onSubmit={handleReset} className="space-y-6">
-          {error && (
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 text-red-700 text-sm flex gap-3 items-start">
-              <AlertCircle size={20} className="shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
+          <CompactInput
+            label="Nueva Contraseña"
+            icon={Lock}
+            type="password"
+            required
+            disabled={!token}
+            placeholder="••••••••"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
 
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-deep-green flex items-center gap-2">
-              <Lock size={16} /> Nueva Contraseña
-            </label>
-            <input
-              type="password"
-              required
-              disabled={!token}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-marine-green focus:border-transparent outline-none transition-all disabled:bg-gray-100"
-              placeholder="••••••••"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-deep-green flex items-center gap-2">
-              <Lock size={16} /> Confirmar Contraseña
-            </label>
-            <input
-              type="password"
-              required
-              disabled={!token}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-marine-green focus:border-transparent outline-none transition-all disabled:bg-gray-100"
-              placeholder="••••••••"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
-          </div>
+          <CompactInput
+            label="Confirmar Contraseña"
+            icon={Lock}
+            type="password"
+            required
+            disabled={!token}
+            placeholder="••••••••"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
 
           <button
             type="submit"
             disabled={loading || !token}
-            className="w-full bg-marine-green hover:bg-deep-green text-barium-yellow font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-gradient-to-br from-primary to-primary-container text-on-primary font-headline font-bold py-4 rounded-2xl shadow-xl shadow-primary/20 hover:-translate-y-0.5 transition-all active:scale-95 flex items-center justify-center gap-2 mt-4"
           >
             {loading ? (
-              <LoadingSpinner size={24} />
+              <LoadingSpinner size={20} />
             ) : (
               "REABLECER CONTRASEÑA"
             )}
@@ -135,8 +123,8 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-screen bg-barium-yellow flex items-center justify-center p-4">
-      <Suspense fallback={<LoadingSpinner size={64} />}>
+    <div className="min-h-screen bg-surface flex items-center justify-center p-4">
+      <Suspense fallback={<LoadingSpinner size={52} fullPage />}>
         <ResetPasswordForm />
       </Suspense>
     </div>

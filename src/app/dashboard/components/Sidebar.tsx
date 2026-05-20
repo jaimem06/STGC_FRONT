@@ -12,6 +12,7 @@ import {
   Key,
   ChevronLeft,
   Menu,
+  X,
   User as UserIcon
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
@@ -32,19 +33,25 @@ export default function Sidebar() {
   const { 
     isSidebarCollapsed, 
     toggleSidebar, 
+    setSidebarCollapsed,
     isMobileSidebarOpen, 
     setMobileSidebarOpen 
   } = useUIStore();
 
   return (
     <>
-      {/* Mobile Menu Trigger */}
-      <button 
-        onClick={() => setMobileSidebarOpen(true)}
-        className="fixed top-4 left-4 z-[60] p-2 rounded-lg bg-primary text-on-primary md:hidden shadow-lg"
-      >
-        <Menu size={20} />
-      </button>
+      {/* Mobile Menu Trigger - Hidden when open to avoid overlap */}
+      {!isMobileSidebarOpen && (
+        <button 
+          onClick={() => {
+            setMobileSidebarOpen(true);
+            setSidebarCollapsed(true);
+          }}
+          className="fixed top-4 left-4 z-[60] p-2 rounded-lg bg-primary text-on-primary md:hidden shadow-lg transition-opacity duration-300"
+        >
+          <Menu size={20} />
+        </button>
+      )}
 
       {/* Backdrop for mobile */}
       {isMobileSidebarOpen && (
@@ -55,12 +62,20 @@ export default function Sidebar() {
       )}
 
       <aside 
-        className={`fixed inset-y-0 left-0 z-[55] bg-surface/80 backdrop-blur-xl border-r border-outline-variant/10 shadow-[8px_0_24px_rgba(31,27,20,0.06)] flex flex-col justify-between py-6 transition-all duration-300 ease-in-out ${
-          isSidebarCollapsed ? "w-20" : "w-64"
-        } ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+        className={`fixed inset-y-0 left-0 z-[55] bg-surface/80 backdrop-blur-xl border-r border-outline-variant/10 shadow-[8px_0_24px_rgba(31,27,20,0.06)] flex flex-col justify-between transition-all duration-300 ease-in-out ${
+          isMobileSidebarOpen ? "translate-x-0 pt-14 pb-6" : "-translate-x-full md:translate-x-0 py-6"
+        } ${isSidebarCollapsed ? "w-20" : "w-64"}`}
       >
+        {/* Mobile Close Button - Centered horizontally to match compact view */}
+        <button 
+          onClick={() => setMobileSidebarOpen(false)}
+          className="md:hidden absolute top-4 left-1/2 -translate-x-1/2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-high text-primary transition-all z-10"
+        >
+          <X size={20} />
+        </button>
+
         {/* Header / Brand */}
-        <div className="px-4 mb-10 flex items-center justify-between">
+        <div className={`px-4 mb-10 flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-between"}`}>
           <div 
             className={`flex items-center gap-3 transition-all duration-300 ${isSidebarCollapsed ? "px-0" : "px-2"}`}
             onClick={() => isSidebarCollapsed && toggleSidebar()}
@@ -76,13 +91,19 @@ export default function Sidebar() {
             )}
           </div>
           
+          {/* Toggle button for desktop */}
           <button 
             onClick={toggleSidebar}
-            className="hidden md:flex items-center justify-center w-8 h-8 rounded-full hover:bg-surface-container-high transition-all text-primary"
+            className={`hidden md:flex items-center justify-center w-7 h-7 rounded-full hover:bg-primary hover:text-on-primary transition-all duration-300 shadow-sm border border-outline-variant/10 text-primary ${
+              isSidebarCollapsed 
+                ? "absolute -right-3.5 top-12 bg-surface/90 backdrop-blur-md" 
+                : "relative"
+            }`}
+            title={isSidebarCollapsed ? "Expandir menú" : "Contraer menú"}
           >
             <ChevronLeft 
-              size={18} 
-              className={`transition-transform duration-300 ${isSidebarCollapsed ? "rotate-180" : ""}`} 
+              size={14} 
+              className={`transition-transform duration-500 ${isSidebarCollapsed ? "rotate-180" : ""}`} 
             />
           </button>
         </div>
@@ -95,7 +116,12 @@ export default function Sidebar() {
               <Link
                 key={item.name}
                 href={item.href}
-                onClick={() => setMobileSidebarOpen(false)}
+                onClick={(e) => {
+                  // En móvil, cerramos el sidebar pero permitimos que el Link maneje la navegación
+                  if (window.innerWidth < 768) {
+                    setMobileSidebarOpen(false);
+                  }
+                }}
                 className={`flex items-center gap-4 py-3 transition-all duration-300 rounded-xl group relative ${
                   isActive 
                     ? "bg-primary text-on-primary shadow-md" 
