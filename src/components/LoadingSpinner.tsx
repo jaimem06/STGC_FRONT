@@ -20,6 +20,7 @@ export default function LoadingSpinner({ size = 40, className = "", fullPage = f
         alt="Cargando..."
         width={size}
         height={size}
+        style={{ height: 'auto' }}
         className="animate-[spin_1.8s_linear_infinite]"
         priority
       />

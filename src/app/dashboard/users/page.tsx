@@ -19,12 +19,12 @@ import {
   UserMinus
 } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import CompactTable from "@/components/CompactTable";
-import CompactInput from "@/components/CompactInput";
-import PremiumSelect from "@/components/PremiumSelect";
-import PremiumDialog from "@/components/PremiumDialog";
-import PremiumConfirm from "@/components/PremiumConfirm";
-import CompactSearch from "@/components/CompactSearch";
+import Table from "@/components/Table";
+import Input from "@/components/Input";
+import Select from "@/components/Select";
+import Dialog from "@/components/Dialog";
+import Confirm from "@/components/Confirm";
+import Search from "@/components/Search";
 import { toast } from "sonner";
 
 interface Permission {
@@ -70,7 +70,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [pageSize, setPageSize] = useState(8);
+  const [pageSize, setPageSize] = useState(10);
 
   // UI State
   const [selectedUserForRole, setSelectedUserForRole] = useState<User | null>(null);
@@ -115,13 +115,12 @@ export default function UsersPage() {
 
   useEffect(() => {
     const calculatePageSize = () => {
-      // Ajuste dinámico de filas según el alto de la pantalla
-      // Reservamos espacio para: Header(100), Search(60), Paginación(60), Padding(100)
-      // Si el formulario está abierto, restamos ~250px adicionales
-      const reservedHeight = isModalOpen ? 580 : 320;
+      // Ajuste dinámico de filas optimizado (Meta: 10 filas mínimo en laptops estándar)
+      // Reservamos espacio para: Header(60), Search(50), Paginación(50), Padding(60)
+      const reservedHeight = isModalOpen ? 480 : 220;
       const availableHeight = window.innerHeight - reservedHeight;
-      const rowHeight = 76; 
-      const calculatedSize = Math.max(3, Math.floor(availableHeight / rowHeight));
+      const rowHeight = 62; // Altura reducida para que quepan 10 filas
+      const calculatedSize = Math.max(5, Math.floor(availableHeight / rowHeight));
       setPageSize(calculatedSize);
     };
 
@@ -246,16 +245,11 @@ export default function UsersPage() {
     {
       header: "Colaborador",
       accessor: (user: User) => (
-        <div className="flex items-center gap-4 whitespace-nowrap">
-          <div className="w-12 h-12 shrink-0 bg-primary-container text-on-primary rounded-2xl flex items-center justify-center font-headline font-bold text-lg shadow-md transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
-            {(user.first_name?.[0] || user.email[0]).toUpperCase()}
-          </div>
-          <div className="min-w-0">
-            <p className="font-label text-base font-bold text-primary">
-              {user.first_name ? `${user.first_name} ${user.last_name}` : user.email}
-            </p>
-            <p className="text-xs text-outline font-medium mt-1">{user.email}</p>
-          </div>
+        <div className="flex flex-col whitespace-nowrap">
+          <p className="font-label text-sm font-bold text-primary">
+            {user.first_name ? `${user.first_name} ${user.last_name}` : user.email}
+          </p>
+          <p className="text-[10px] text-outline font-medium">{user.email}</p>
         </div>
       ),
     },
@@ -265,14 +259,14 @@ export default function UsersPage() {
       accessor: (user: User) => (
         <div className="flex flex-col">
           <span className="text-sm font-bold text-primary">{user.identifier || "---"}</span>
-          <span className="text-[10px] text-outline font-bold uppercase tracking-widest mt-1">ID / Cédula</span>
+          <span className="text-[10px] text-outline font-bold uppercase tracking-widest mt-0.5">ID / Cédula</span>
         </div>
       ),
     },
     {
       header: "Cargo / Nivel",
       accessor: (user: User) => (
-        <div className="flex flex-col gap-1.5 py-1 min-h-[48px] justify-center">
+        <div className="flex flex-col gap-1 py-1 min-h-[44px] justify-center">
           <div 
             className="group/role cursor-pointer flex flex-col" 
             onClick={() => {
@@ -289,7 +283,7 @@ export default function UsersPage() {
                 <Edit2 size={10} className="text-primary/60 group-hover/role:text-primary transition-colors" />
               </div>
             </div>
-            <div className="flex flex-wrap gap-1 mt-1">
+            <div className="flex flex-wrap gap-1 mt-0.5">
               {user.role.permissions.map(p => (
                 <span key={p.name} className="text-[9px] text-outline font-bold uppercase tracking-tighter opacity-70">
                   • {p.name.replace(/_/g, ' ')}
@@ -307,7 +301,7 @@ export default function UsersPage() {
         const StatusIcon = statusIcons[user.status];
         return (
           <div className="flex flex-col gap-1">
-            <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-extrabold border uppercase tracking-widest shadow-sm transition-all whitespace-nowrap ${statusStyles[user.status]}`}>
+            <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-xl text-xs font-extrabold border uppercase tracking-widest shadow-sm transition-all whitespace-nowrap ${statusStyles[user.status]}`}>
               <StatusIcon size={14} />
               {user.status}
             </span>
@@ -390,7 +384,7 @@ export default function UsersPage() {
         </button>
       </div>
 
-      <CompactSearch 
+      <Search 
         value={search}
         onChange={setSearch}
         placeholder="Buscar por correo o cargo..."
@@ -424,34 +418,34 @@ export default function UsersPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
-                <CompactInput
+                <Input
                   label="Nombres"
                   required
                   placeholder="Juan"
                   value={newFirstName}
                   onChange={(e) => setNewFirstName(e.target.value)}
                 />
-                <CompactInput
+                <Input
                   label="Apellidos"
                   required
                   placeholder="Pérez"
                   value={newLastName}
                   onChange={(e) => setNewLastName(e.target.value)}
                 />
-                <CompactInput
+                <Input
                   label="Identificación"
                   required
                   placeholder="12345678"
                   value={newIdentifier}
                   onChange={(e) => setNewIdentifier(e.target.value)}
                 />
-                <CompactInput
+                <Input
                   label="Teléfono"
                   placeholder="0999999999"
                   value={newPhoneNumber}
                   onChange={(e) => setNewPhoneNumber(e.target.value)}
                 />
-                <CompactInput
+                <Input
                   label="Correo Electrónico"
                   icon={Mail}
                   type="email"
@@ -461,7 +455,7 @@ export default function UsersPage() {
                   onChange={(e) => setNewEmail(e.target.value)}
                 />
 
-                <CompactInput
+                <Input
                   label="Contraseña Temporal"
                   icon={Lock}
                   type="password"
@@ -473,7 +467,7 @@ export default function UsersPage() {
 
                 <div className="md:col-span-2 flex gap-4">
                   <div className="flex-1">
-                    <PremiumSelect
+                    <Select
                       label="Rol Asignado"
                       icon={Shield}
                       required
@@ -514,7 +508,7 @@ export default function UsersPage() {
 
                   <form onSubmit={handleSuspend} className="space-y-6">
                     <div className="grid grid-cols-1 gap-6">
-                      <CompactInput
+                      <Input
                         label="Desde"
                         icon={Calendar}
                         type="date"
@@ -522,7 +516,7 @@ export default function UsersPage() {
                         value={suspendedFrom}
                         onChange={(e) => setSuspendedFrom(e.target.value)}
                       />
-                      <CompactInput
+                      <Input
                         label="Hasta"
                         icon={Calendar}
                         type="date"
@@ -554,7 +548,7 @@ export default function UsersPage() {
             </div>
           )}
 
-          <CompactTable 
+          <Table 
             data={filteredUsers}
             columns={columns}
             rowKey={(u) => u.id}
@@ -565,14 +559,14 @@ export default function UsersPage() {
       )}
 
       {/* Role Management Dialog */}
-      <PremiumDialog
+      <Dialog
         isOpen={!!selectedUserForRole}
         onOpenChange={(open) => !open && setSelectedUserForRole(null)}
         title="Gestionar Cargo"
         description={`Actualiza el nivel de acceso para ${selectedUserForRole?.first_name ? `${selectedUserForRole.first_name} ${selectedUserForRole.last_name}` : selectedUserForRole?.email}`}
       >
         <div className="space-y-6">
-          <PremiumSelect
+          <Select
             label="Nuevo Cargo / Rol"
             icon={Shield}
             value={selectedRoleName}
@@ -596,9 +590,9 @@ export default function UsersPage() {
             </button>
           </div>
         </div>
-      </PremiumDialog>
+      </Dialog>
 
-      <PremiumConfirm
+      <Confirm
         open={isConfirmInactivateOpen}
         onOpenChange={setIsConfirmInactivateOpen}
         title="¿Desactivar usuario?"

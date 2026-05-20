@@ -11,7 +11,9 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: 'standalone',
+  productionBrowserSourceMaps: false,
+  reactStrictMode: true,
 };
 
 export default withPWA(nextConfig);

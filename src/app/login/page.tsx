@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { toast } from "sonner";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import CompactInput from "@/components/CompactInput";
+import Input from "@/components/Input";
 import { Mail, Lock } from "lucide-react";
 
 export default function LoginPage() {
@@ -101,7 +101,7 @@ export default function LoginPage() {
           {/* Login Form */}
           <form onSubmit={handleLogin} className="space-y-4 max-w-sm">
             <div className="space-y-4">
-              <CompactInput
+              <Input
                 label="Correo Electrónico"
                 icon={Mail}
                 type="email"
@@ -112,7 +112,7 @@ export default function LoginPage() {
               />
 
               <div className="relative">
-                <CompactInput
+                <Input
                   label="Contraseña"
                   icon={Lock}
                   type="password"

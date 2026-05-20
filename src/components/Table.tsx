@@ -12,7 +12,7 @@ interface Column<T> {
   hideOnMobile?: boolean;
 }
 
-interface CompactTableProps<T> {
+interface TableProps<T> {
   data: T[];
   columns: Column<T>[];
   loading?: boolean;
@@ -35,7 +35,7 @@ const TableRow = React.memo(function TableRow({
       {columns.map((col, colIdx) => (
         <td
           key={colIdx}
-          className={`px-4 md:px-6 py-4 ${col.className || ""} ${
+          className={`px-4 md:px-6 py-2.5 ${col.className || ""} ${
             col.hideOnMobile ? "hidden md:table-cell" : ""
           } ${
             col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : ""
@@ -50,14 +50,14 @@ const TableRow = React.memo(function TableRow({
   );
 });
 
-export default function CompactTable<T>({
+export default function Table<T>({
   data,
   columns,
   loading,
   emptyMessage = "No se encontraron datos",
   rowKey,
   pageSize = 8,
-}: CompactTableProps<T>) {
+}: TableProps<T>) {
   const [currentPage, setCurrentPage] = useState(1);
 
   const paginatedData = useMemo(() => {

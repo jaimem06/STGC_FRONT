@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { Mail, ArrowLeft, CheckCircle2 } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import CompactInput from "@/components/CompactInput";
+import Input from "@/components/Input";
 import { toast } from "sonner";
 
 export default function RecoveryPage() {
@@ -69,7 +69,7 @@ export default function RecoveryPage() {
           </p>
 
           <form onSubmit={handleRecovery} className="space-y-8">
-            <CompactInput
+            <Input
               label="Correo Electrónico"
               icon={Mail}
               type="email"

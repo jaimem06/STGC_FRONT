@@ -3,19 +3,19 @@
 import React from "react";
 import { LucideIcon } from "lucide-react";
 
-interface CompactInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   icon?: LucideIcon;
   error?: string;
 }
 
-export default function CompactInput({
+export default function Input({
   label,
   icon: Icon,
   error,
   className = "",
   ...props
-}: CompactInputProps) {
+}: InputProps) {
   return (
     <div className={`space-y-1 ${className}`}>
       <label className="block font-label text-[9px] font-bold uppercase tracking-widest text-outline ml-1">

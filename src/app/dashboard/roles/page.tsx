@@ -12,8 +12,8 @@ import {
   AlertTriangle
 } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import CompactInput from "@/components/CompactInput";
-import PremiumConfirm from "@/components/PremiumConfirm";
+import Input from "@/components/Input";
+import Confirm from "@/components/Confirm";
 import { toast } from "sonner";
 
 interface Permission {
@@ -182,14 +182,14 @@ export default function RolesPage() {
             
             <form onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <CompactInput
+                <Input
                   label="Nombre del Rol"
                   required
                   placeholder="Ej: SUPERVISOR"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
-                <CompactInput
+                <Input
                   label="Descripción"
                   placeholder="Breve descripción..."
                   value={description}
@@ -247,7 +247,7 @@ export default function RolesPage() {
         </div>
       )}
 
-      <PremiumConfirm
+      <Confirm
         open={isConfirmOpen}
         onOpenChange={setIsConfirmOpen}
         title="¿Eliminar este rol?"

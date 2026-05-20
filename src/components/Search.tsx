@@ -1,25 +1,25 @@
 "use client";
 
 import React from "react";
-import { Search, X } from "lucide-react";
+import { Search as SearchIcon, X } from "lucide-react";
 
-interface CompactSearchProps {
+interface SearchProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
 }
 
-export default function CompactSearch({
+export default function Search({
   value,
   onChange,
   placeholder = "Buscar...",
   className = "",
-}: CompactSearchProps) {
+}: SearchProps) {
   return (
     <div className={`relative group ${className}`}>
       <div className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors duration-300">
-        <Search 
+        <SearchIcon 
           size={18} 
           className="text-outline group-focus-within:text-primary" 
         />

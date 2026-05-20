@@ -3,7 +3,7 @@
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 import { AlertCircle, Trash2 } from "lucide-react";
 
-interface PremiumConfirmProps {
+interface ConfirmProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -13,7 +13,7 @@ interface PremiumConfirmProps {
   variant?: "danger" | "warning";
 }
 
-export default function PremiumConfirm({
+export default function Confirm({
   open,
   onOpenChange,
   title,
@@ -21,7 +21,7 @@ export default function PremiumConfirm({
   onConfirm,
   confirmText = "CONTINUAR",
   variant = "danger",
-}: PremiumConfirmProps) {
+}: ConfirmProps) {
   return (
     <AlertDialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <AlertDialogPrimitive.Portal>

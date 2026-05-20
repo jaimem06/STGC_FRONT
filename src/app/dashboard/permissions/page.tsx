@@ -5,13 +5,12 @@ import { api } from "@/lib/api";
 import { 
   Key, 
   Plus, 
-  Search,
   CheckCircle2,
   Info
 } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import CompactInput from "@/components/CompactInput";
-import CompactSearch from "@/components/CompactSearch";
+import Input from "@/components/Input";
+import Search from "@/components/Search";
 import { toast } from "sonner";
 
 interface Permission {
@@ -87,14 +86,14 @@ export default function PermissionsPage() {
             <Key size={20} className="text-secondary-container" /> Crear Nuevo Permiso Granular
           </h3>
           <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <CompactInput
+            <Input
               label="Nombre del Permiso"
               required
               placeholder="ej: editar_post"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <CompactInput
+            <Input
               label="Descripción"
               placeholder="Descripción corta..."
               value={description}
@@ -119,7 +118,7 @@ export default function PermissionsPage() {
         </div>
       )}
 
-      <CompactSearch 
+      <Search 
         value={search}
         onChange={setSearch}
         placeholder="Buscar permisos por nombre o descripción..."

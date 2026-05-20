@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Lock, CheckCircle2, AlertCircle } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import CompactInput from "@/components/CompactInput";
+import Input from "@/components/Input";
 import { toast } from "sonner";
 
 function ResetPasswordForm() {
@@ -82,7 +82,7 @@ function ResetPasswordForm() {
         </p>
 
         <form onSubmit={handleReset} className="space-y-6">
-          <CompactInput
+          <Input
             label="Nueva Contraseña"
             icon={Lock}
             type="password"
@@ -93,7 +93,7 @@ function ResetPasswordForm() {
             onChange={(e) => setNewPassword(e.target.value)}
           />
 
-          <CompactInput
+          <Input
             label="Confirmar Contraseña"
             icon={Lock}
             type="password"

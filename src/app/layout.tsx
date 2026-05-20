@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Manrope, Public_Sans } from "next/font/google";
 import "./globals.css";
-import PremiumToaster from "@/components/PremiumToaster";
+import Toaster from "@/components/Toaster";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,7 +52,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {children}
-        <PremiumToaster />
+        <Toaster />
       </body>
     </html>
   );
