@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { api } from "@/lib/api";
 import { 
   UserPlus, 
@@ -16,7 +16,8 @@ import {
   Edit2,
   UserCheck,
   UserX,
-  UserMinus
+  UserMinus,
+  SlidersHorizontal
 } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import Table from "@/components/Table";
@@ -70,6 +71,9 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [filterRole, setFilterRole] = useState("ALL");
+  const [filterStatus, setFilterStatus] = useState("ALL");
+  const [showFilters, setShowFilters] = useState(false);
   const [pageSize, setPageSize] = useState(10);
 
   // UI State
@@ -114,30 +118,62 @@ export default function UsersPage() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+    
+    const initFetch = async () => {
+      try {
+        const [usersRes, rolesRes] = await Promise.all([
+          api.get("/users"),
+          api.get("/roles")
+        ]);
+        if (isMounted) {
+          setUsers(usersRes.data);
+          setRoles(rolesRes.data);
+        }
+      } catch (_err) {
+        if (isMounted) {
+          setError("No tienes permisos suficientes para ver esta lista o el servidor no responde.");
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    initFetch();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
     const calculatePageSize = () => {
-      // Ajuste dinámico de filas optimizado (Meta: 10 filas mínimo en laptops estándar)
-      // Reservamos espacio para: Header(60), Search(50), Paginación(50), Padding(60)
       const reservedHeight = isModalOpen ? 480 : 220;
       const availableHeight = window.innerHeight - reservedHeight;
-      const rowHeight = 62; // Altura reducida para que quepan 10 filas
+      const rowHeight = 62;
       const calculatedSize = Math.max(5, Math.floor(availableHeight / rowHeight));
-      setPageSize(calculatedSize);
+      
+      timeoutId = setTimeout(() => {
+        setPageSize(prev => prev !== calculatedSize ? calculatedSize : prev);
+      }, 0);
     };
 
     calculatePageSize();
     window.addEventListener('resize', calculatePageSize);
-    return () => window.removeEventListener('resize', calculatePageSize);
+    return () => {
+      window.removeEventListener('resize', calculatePageSize);
+      clearTimeout(timeoutId);
+    };
   }, [isModalOpen]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
 
   const updateUser = async (userId: string, data: { role_name?: string; status?: string }) => {
     try {
       await api.patch(`/users/${userId}`, data);
       toast.success("Usuario actualizado");
-      fetchData(); // Recargar lista
+      fetchData();
     } catch (err) {
       console.error("Error updating user:", err);
       toast.error("Error al actualizar usuario");
@@ -152,7 +188,6 @@ export default function UsersPage() {
       await updateUser(selectedUserForRole.id, { role_name: selectedRoleName });
       setSelectedUserForRole(null);
     } catch (_err) {
-      // toast.error is handled in updateUser
     } finally {
       setIsUpdatingRole(false);
     }
@@ -186,8 +221,8 @@ export default function UsersPage() {
       setNewPhoneNumber("");
       setNewRole("");
       fetchData();
-    } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
       toast.error(typeof detail === 'string' ? detail : "Error al registrar usuario");
     } finally {
       setIsRegistering(false);
@@ -212,8 +247,8 @@ export default function UsersPage() {
       setSuspendedFrom("");
       setSuspendedUntil("");
       fetchData();
-    } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
       toast.error(typeof detail === 'string' ? detail : "Error al suspender usuario");
     } finally {
       setIsSuspending(false);
@@ -225,7 +260,6 @@ export default function UsersPage() {
     try {
       await updateUser(userToInactivate.id, { status: "INACTIVO" });
     } catch (_err) {
-      // toast.error is handled in updateUser
     } finally {
       setIsConfirmInactivateOpen(false);
       setUserToInactivate(null);
@@ -236,10 +270,22 @@ export default function UsersPage() {
     return str.replace(/_/g, ' ').toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
-  const filteredUsers = users.filter(u => 
-    u.email.toLowerCase().includes(search.toLowerCase()) || 
-    u.role.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => {
+      const matchesSearch = 
+        search === "" ||
+        u.email.toLowerCase().includes(search.toLowerCase()) || 
+        u.role.name.toLowerCase().includes(search.toLowerCase()) ||
+        (u.first_name && u.first_name.toLowerCase().includes(search.toLowerCase())) ||
+        (u.last_name && u.last_name.toLowerCase().includes(search.toLowerCase())) ||
+        (u.identifier && u.identifier.toLowerCase().includes(search.toLowerCase()));
+
+      const matchesRole = filterRole === "ALL" || u.role.name === filterRole;
+      const matchesStatus = filterStatus === "ALL" || u.status === filterStatus;
+
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+  }, [users, search, filterRole, filterStatus]);
 
   const columns = [
     {
@@ -319,7 +365,6 @@ export default function UsersPage() {
       align: "right" as const,
       accessor: (user: User) => (
         <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-          {/* Activar */}
           {user.status !== "ACTIVO" && (
             <button 
               onClick={() => updateUser(user.id, { status: "ACTIVO" })}
@@ -329,7 +374,6 @@ export default function UsersPage() {
               <UserCheck size={18} />
             </button>
           )}
-          {/* Pendiente */}
           {user.status !== "PENDIENTE" && (
             <button 
               onClick={() => updateUser(user.id, { status: "PENDIENTE" })}
@@ -339,7 +383,6 @@ export default function UsersPage() {
               <Clock size={18} />
             </button>
           )}
-          {/* Suspender */}
           {user.status !== "SUSPENDIDO" && (
             <button 
               onClick={() => setSuspendingUserId(user.id)}
@@ -349,7 +392,6 @@ export default function UsersPage() {
               <UserMinus size={18} />
             </button>
           )}
-          {/* Inactivar */}
           {user.status !== "INACTIVO" && (
             <button 
               onClick={() => {
@@ -384,11 +426,64 @@ export default function UsersPage() {
         </button>
       </div>
 
-      <Search 
-        value={search}
-        onChange={setSearch}
-        placeholder="Buscar por correo o cargo..."
-      />
+      {/* Persistent Action Bar - Forced Visibility */}
+      <div className="relative z-20 w-full bg-white/95 backdrop-blur-xl p-4 rounded-[32px] border border-outline-variant/30 shadow-[0_8px_30px_rgba(31,27,20,0.06)]">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
+          <div className="flex-1 min-w-0">
+            <Search 
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por nombre, correo o ID..."
+              className="!bg-transparent !border-none !shadow-none"
+            />
+          </div>
+          
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="hidden md:block w-px h-8 bg-outline-variant/30" />
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              className={`h-11 px-6 rounded-2xl border transition-all flex items-center justify-center gap-3 font-headline font-extrabold text-[10px] uppercase tracking-widest ${
+                showFilters || filterRole !== "ALL" || filterStatus !== "ALL"
+                  ? "bg-secondary text-white border-secondary shadow-lg shadow-secondary/20"
+                  : "bg-surface-container text-primary border-outline-variant/10 hover:bg-surface-container-high"
+              }`}
+            >
+              <SlidersHorizontal size={16} />
+              <span>Filtrar</span>
+              {(filterRole !== "ALL" || filterStatus !== "ALL") && (
+                <div className="w-2 h-2 rounded-full bg-white animate-pulse shadow-sm" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Dynamic Filter Panel */}
+        {showFilters && (
+          <div className="mt-4 pt-4 border-t border-outline-variant/10 grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-4 duration-300">
+            <Select
+              label="Cargo / Rol"
+              value={filterRole}
+              onValueChange={setFilterRole}
+              options={[
+                { value: "ALL", label: "Todos los Roles" },
+                ...roles.map(r => ({ value: r.name, label: formatString(r.name) }))
+              ]}
+            />
+            <Select
+              label="Estatus de Cuenta"
+              value={filterStatus}
+              onValueChange={setFilterStatus}
+              options={[
+                { value: "ALL", label: "Todos los Estados" },
+                { value: "ACTIVO", label: "Activo" },
+                { value: "INACTIVO", label: "Inactivo" },
+                { value: "SUSPENDIDO", label: "Suspendido" },
+                { value: "PENDIENTE", label: "Pendiente" },
+              ]}
+            />
+          </div>
+        )}
+      </div>
 
       {error ? (
         <div className="bg-error-container/10 border border-error/20 text-error p-6 rounded-2xl flex gap-3 items-center">
@@ -396,7 +491,7 @@ export default function UsersPage() {
           <p className="font-body text-sm font-medium">{error}</p>
         </div>
       ) : (
-        <div className="bg-white rounded-[32px] shadow-sm border border-outline-variant/10 overflow-hidden">
+        <div className="bg-white rounded-[32px] shadow-sm border border-outline-variant/10 overflow-hidden relative z-10">
           {/* Inline Registration Form */}
           {isModalOpen && (
             <form 
@@ -490,7 +585,7 @@ export default function UsersPage() {
 
           {/* Suspension Modal */}
           {suspendingUserId && (
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
               <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="p-8">
                   <div className="flex justify-between items-start mb-6">
@@ -514,7 +609,7 @@ export default function UsersPage() {
                         type="date"
                         required
                         value={suspendedFrom}
-                        onChange={(e) => setSuspendedFrom(e.target.value)}
+                        onChange={(e) => setSuspendingUserId(user.id)}
                       />
                       <Input
                         label="Hasta"
@@ -558,7 +653,6 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* Role Management Dialog */}
       <Dialog
         isOpen={!!selectedUserForRole}
         onOpenChange={(open) => !open && setSelectedUserForRole(null)}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import { 
   ShieldCheck, 
@@ -9,7 +9,8 @@ import {
   Edit3, 
   CheckSquare, 
   Square,
-  AlertTriangle
+  AlertTriangle,
+  X
 } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import Input from "@/components/Input";
@@ -45,11 +46,7 @@ export default function RolesPage() {
   const [description, setDescription] = useState("");
   const [selectedPerms, setSelectedPerms] = useState<string[]>([]);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [rolesRes, permsRes] = await Promise.all([
         api.get("/roles"),
@@ -63,15 +60,23 @@ export default function RolesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { name, description, permission_ids: selectedPerms };
+    const payload = { 
+      name: name.toUpperCase(), 
+      description, 
+      permission_ids: selectedPerms 
+    };
 
     try {
       if (editingRole) {
-        await api.put(`/roles/${editingRole.id}`, payload);
+        await api.patch(`/roles/${editingRole.id}`, payload);
         toast.success("Rol actualizado con éxito");
       } else {
         await api.post("/roles", payload);
@@ -85,8 +90,8 @@ export default function RolesPage() {
     }
   };
 
-  const deleteRole = async (id: string) => {
-    setRoleToDelete(id);
+  const confirmDelete = (roleId: string) => {
+    setRoleToDelete(roleId);
     setIsConfirmOpen(true);
   };
 
@@ -119,18 +124,24 @@ export default function RolesPage() {
     setIsModalOpen(true);
   };
 
+  const togglePerm = (id: string) => {
+    setSelectedPerms(prev => 
+      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+    );
+  };
+
   if (loading) return <LoadingSpinner size={52} fullPage />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in-up">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-secondary">Roles del Sistema</h1>
-          <p className="text-gray-500">Define las jerarquías y sus permisos asociados</p>
+          <p className="text-gray-500 text-sm">Define las jerarquías y sus permisos asociados</p>
         </div>
         <button 
           onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="bg-secondary-container text-surface px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-secondary transition-all shadow-md"
+          className="bg-secondary-container text-surface px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-secondary transition-all shadow-md text-xs uppercase tracking-widest"
         >
           <Plus size={20} /> NUEVO ROL
         </button>
@@ -138,49 +149,62 @@ export default function RolesPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {roles.map((role) => (
-          <div key={role.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
-              <div className="bg-surface p-3 rounded-xl text-secondary-container">
-                <ShieldCheck size={24} />
+          <div key={role.id} className="bg-white rounded-[32px] p-8 border border-outline-variant/10 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex justify-between items-start mb-6">
+              <div className="bg-surface p-3 rounded-xl text-secondary-container shadow-inner">
+                <ShieldCheck size={28} />
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => openEdit(role)} className="p-2 text-gray-400 hover:text-secondary-container transition-colors">
+              <div className="flex gap-1">
+                <button onClick={() => openEdit(role)} className="p-2 text-outline hover:text-secondary transition-colors">
                   <Edit3 size={18} />
                 </button>
-                <button onClick={() => deleteRole(role.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                <button onClick={() => confirmDelete(role.id)} className="p-2 text-outline hover:text-error transition-colors">
                   <Trash2 size={18} />
                 </button>
               </div>
             </div>
             
-            <h3 className="text-lg font-bold text-secondary">{role.name}</h3>
-            <p className="text-sm text-gray-500 mb-6 flex-1">{role.description || "Sin descripción"}</p>
-            
-            <div className="space-y-2">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Permisos Asignados</p>
-              <div className="flex flex-wrap gap-2">
-                {role.permissions.map(p => (
-                  <span key={p.id} className="text-[10px] bg-secondary-container/10 text-secondary-container px-2 py-1 rounded-md font-medium">
+            <h3 className="text-xl font-headline font-extrabold text-primary mb-2 tracking-tight group-hover:text-secondary-container transition-colors uppercase">
+              {role.name}
+            </h3>
+            <p className="text-sm text-on-surface-variant mb-6 min-h-[40px] font-medium leading-relaxed italic opacity-70">
+              {role.description || "Sin descripción"}
+            </p>
+
+            <div className="pt-6 border-t border-outline-variant/5">
+              <p className="text-[10px] font-bold text-outline uppercase tracking-widest mb-3">Permisos Asignados</p>
+              <div className="flex flex-wrap gap-1.5">
+                {role.permissions.map((p) => (
+                  <span key={p.id} className="text-[10px] bg-secondary-container/10 text-secondary-container px-2 py-1 rounded-md font-medium border border-secondary-container/5">
                     {p.name}
                   </span>
                 ))}
-                {role.permissions.length === 0 && <p className="text-xs text-gray-400 italic">Ningún permiso</p>}
+                {role.permissions.length === 0 && <p className="text-[10px] text-outline/50 italic font-medium">Ningún permiso asignado</p>}
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Modal Simplificado */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-secondary">{editingRole ? "Editar Rol" : "Crear Nuevo Rol"}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex justify-end">
+          <div className="bg-white w-full max-w-2xl h-full shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
+            <div className="p-8 border-b border-outline-variant/5 flex justify-between items-center bg-surface/30 backdrop-blur-md">
+              <div>
+                <h2 className="text-2xl font-headline font-extrabold text-primary uppercase tracking-tighter">
+                  {editingRole ? "Editar Estructura" : "Nuevo Rol de Acceso"}
+                </h2>
+                <p className="text-[10px] font-bold text-outline uppercase tracking-widest mt-1">Configuración de capacidades</p>
+              </div>
+              <button 
+                onClick={() => setIsModalOpen(false)} 
+                className="p-2 hover:bg-surface-container rounded-full text-outline transition-colors"
+              >
+                <X size={20} />
+              </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-6">
+            <form onSubmit={handleSubmit} className="overflow-y-auto p-8 space-y-8 custom-scrollbar">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   label="Nombre del Rol"
@@ -190,54 +214,60 @@ export default function RolesPage() {
                   onChange={(e) => setName(e.target.value)}
                 />
                 <Input
-                  label="Descripción"
-                  placeholder="Breve descripción..."
+                  label="Descripción Funcional"
+                  placeholder="Explica el alcance..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
               </div>
 
               <div className="space-y-4">
-                <label className="block font-label text-[9px] font-bold uppercase tracking-widest text-outline ml-1">
+                <label className="block font-label text-[10px] font-bold uppercase tracking-widest text-outline ml-1">
                   Asignar Permisos Granulares
                 </label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                
+                <div className="bg-tertiary/5 border border-tertiary/10 rounded-2xl p-4 flex gap-3 text-tertiary">
+                  <AlertTriangle className="shrink-0 mt-0.5" size={20} />
+                  <p className="text-[11px] leading-relaxed font-medium italic">
+                    <strong>Advertencia de Seguridad:</strong> Asignar privilegios como <code className="bg-tertiary/10 px-1 rounded not-italic font-bold">ALL_ACCESS</code> otorga control total. Procede con precaución.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {permissions.map((perm) => {
                     const isSelected = selectedPerms.includes(perm.id);
                     return (
                       <button
                         key={perm.id}
                         type="button"
-                        onClick={() => {
-                          setSelectedPerms(prev => 
-                            isSelected ? prev.filter(id => id !== perm.id) : [...prev, perm.id]
-                          );
-                        }}
-                        className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+                        onClick={() => togglePerm(perm.id)}
+                        className={`p-4 rounded-2xl border text-[11px] font-bold transition-all text-left flex items-center gap-3 group/perm ${
                           isSelected 
-                            ? "bg-secondary-container/10 border-secondary-container text-secondary-container" 
-                            : "bg-gray-50 border-gray-100 text-gray-500 hover:border-gray-300"
+                            ? "bg-secondary text-white border-secondary shadow-lg shadow-secondary/10" 
+                            : "bg-surface border-outline-variant/20 text-on-surface-variant hover:border-primary/40 shadow-sm"
                         }`}
                       >
-                        {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
-                        <span className="text-xs font-semibold">{perm.name}</span>
+                        <div className={`p-1 rounded-md transition-colors ${isSelected ? "bg-white/20" : "bg-surface-container text-outline group-hover/perm:text-primary"}`}>
+                          {isSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+                        </div>
+                        <span className="truncate uppercase tracking-tight" title={perm.name}>{perm.name.replace(/_/g, ' ')}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-gray-100 flex gap-4">
+              <div className="pt-8 border-t border-outline-variant/5 flex gap-4 sticky bottom-0 bg-white pb-4">
                 <button 
-                  type="button"
+                  type="button" 
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 px-4 py-3 rounded-lg border border-gray-200 font-bold text-gray-500 hover:bg-gray-50 transition-colors"
+                  className="px-8 py-4 rounded-2xl border border-outline-variant/30 font-bold text-outline text-xs uppercase tracking-widest hover:bg-surface-container transition-all"
                 >
                   CANCELAR
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 px-4 py-3 rounded-lg bg-secondary-container text-surface font-bold hover:bg-secondary transition-colors"
+                  className="flex-1 px-8 py-4 rounded-2xl bg-primary text-white font-bold text-xs uppercase tracking-widest shadow-xl shadow-primary/10 hover:shadow-2xl active:scale-95 transition-all"
                 >
                   {editingRole ? "ACTUALIZAR ROL" : "CREAR ROL"}
                 </button>
@@ -251,7 +281,7 @@ export default function RolesPage() {
         open={isConfirmOpen}
         onOpenChange={setIsConfirmOpen}
         title="¿Eliminar este rol?"
-        description="Esta acción es permanente. Los usuarios que tengan este rol serán reasignados automáticamente a 'Cajero Mesero'."
+        description="Esta acción es permanente. Los usuarios que tengan este rol serán reasignados automáticamente a 'Cajero Mesero' para evitar pérdida de acceso."
         onConfirm={handleConfirmDelete}
         confirmText="ELIMINAR ROL"
         variant="danger"

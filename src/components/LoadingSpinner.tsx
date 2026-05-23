@@ -15,15 +15,20 @@ export default function LoadingSpinner({ size = 40, className = "", fullPage = f
 
   return (
     <div className={containerClasses}>
-      <Image
-        src="/loader cafe.svg"
-        alt="Cargando..."
-        width={size}
-        height={size}
-        style={{ height: 'auto' }}
-        className="animate-[spin_1.8s_linear_infinite]"
-        priority
-      />
+      <div 
+        style={{ width: size, height: size }} 
+        className="relative shrink-0 flex items-center justify-center"
+      >
+        <Image
+          src="/loader cafe.svg"
+          alt="Cargando..."
+          width={size}
+          height={size}
+          className="animate-[spin_1.8s_linear_infinite]"
+          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          priority
+        />
+      </div>
     </div>
   );
 }
