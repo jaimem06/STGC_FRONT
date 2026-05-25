@@ -2,131 +2,110 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useForm } from "react-hook-form";
 import { api } from "@/lib/api";
-import { Lock, CheckCircle2, AlertCircle } from "lucide-react";
+import { PasswordResetConfirmSchema, PasswordResetConfirmInput } from "@/lib/schemas";
+import { toast } from "sonner";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import Input from "@/components/Input";
-import { toast } from "sonner";
+import { Lock, Save, AlertCircle } from "lucide-react";
 
 function ResetPasswordForm() {
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const router = useRouter();
+
+  const { register, handleSubmit, setValue } = useForm<PasswordResetConfirmInput>();
 
   useEffect(() => {
-    if (!token) {
-      toast.error("Token de recuperación no encontrado. Solicita uno nuevo.");
+    if (token) {
+      setValue("token", token);
     }
-  }, [token]);
+  }, [token, setValue]);
 
-  const handleReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (newPassword !== confirmPassword) {
-      toast.error("Las contraseñas no coinciden");
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      toast.error("La contraseña debe tener al menos 6 caracteres");
+  const onSubmit = async (data: PasswordResetConfirmInput) => {
+    const result = PasswordResetConfirmSchema.safeParse(data);
+    if (!result.success) {
+      toast.error(result.error.errors[0].message);
       return;
     }
 
     setLoading(true);
-
     try {
-      await api.post("/auth/reset-password", { 
-        token, 
-        new_password: newPassword 
-      });
-      setSuccess(true);
-      toast.success("¡Contraseña actualizada!");
+      await api.post("auth/reset-password", data);
+      toast.success("Contraseña actualizada con éxito.");
+      router.push("/login");
     } catch (err: any) {
       const detail = err.response?.data?.detail;
-      toast.error(typeof detail === 'string' ? detail : "El enlace es inválido o ha expirado");
+      toast.error(typeof detail === "string" ? detail : "Error al restablecer la contraseña.");
     } finally {
       setLoading(false);
     }
   };
 
-  if (success) {
+  if (!token) {
     return (
-      <div className="max-w-md w-full bg-white/50 backdrop-blur-xl rounded-[40px] shadow-2xl p-10 text-center border border-outline-variant/10 animate-fade-in-up">
-        <div className="w-16 h-16 bg-secondary/10 text-secondary rounded-full flex items-center justify-center mx-auto mb-6">
-          <CheckCircle2 size={32} />
+      <div className="text-center space-y-4">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-error-container/20 text-error rounded-full mb-4">
+          <AlertCircle size={32} />
         </div>
-        <h1 className="font-headline text-3xl font-extrabold text-primary mb-3">¡Éxito!</h1>
-        <p className="font-body text-on-surface-variant mb-8 text-sm leading-relaxed">
-          Tu contraseña ha sido actualizada. Ahora puedes volver a entrar al sistema.
+        <h2 className="font-headline text-2xl font-black text-primary">Token Inválido</h2>
+        <p className="font-body text-sm text-on-surface-variant max-w-xs mx-auto">
+          El enlace de recuperación es inválido o ha expirado. Por favor, solicita uno nuevo.
         </p>
         <button
-          onClick={() => router.push("/login")}
-          className="w-full bg-primary text-on-primary font-headline font-bold py-4 rounded-2xl shadow-xl shadow-primary/20 hover:-translate-y-0.5 transition-all active:scale-95"
+          onClick={() => router.push("/password-recovery")}
+          className="w-full h-12 bg-primary text-on-primary rounded-xl font-bold text-xs uppercase tracking-widest mt-4"
         >
-          IR AL LOGIN
+          SOLICITAR NUEVO ENLACE
         </button>
       </div>
     );
   }
 
   return (
-    <div className="max-w-md w-full bg-white/50 backdrop-blur-xl rounded-[40px] shadow-2xl border border-outline-variant/10 overflow-hidden animate-fade-in-up">
-      <div className="p-10">
-        <h1 className="font-headline text-3xl font-extrabold text-primary mb-3">Nueva Contraseña</h1>
-        <p className="font-body text-on-surface-variant mb-10 text-sm leading-relaxed">
-          Crea una clave segura para proteger tu acceso a la plataforma STGC.
-        </p>
+    <>
+      {loading && <LoadingSpinner fullPage message="Actualizando contraseña..." />}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <div className="mb-8">
+          <h1 className="font-headline text-3xl font-extrabold text-primary tracking-tight mb-2">Nueva Contraseña</h1>
+          <p className="font-body text-sm text-on-surface-variant font-medium opacity-70">
+            Crea una contraseña segura para proteger tu cuenta.
+          </p>
+        </div>
 
-        <form onSubmit={handleReset} className="space-y-6">
-          <Input
-            label="Nueva Contraseña"
-            icon={Lock}
-            type="password"
-            required
-            disabled={!token}
-            placeholder="••••••••"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-          />
+        <input type="hidden" {...register("token")} />
+        
+        <Input
+          label="Nueva Contraseña"
+          icon={Lock}
+          type="password"
+          placeholder="••••••••"
+          {...register("new_password")}
+        />
 
-          <Input
-            label="Confirmar Contraseña"
-            icon={Lock}
-            type="password"
-            required
-            disabled={!token}
-            placeholder="••••••••"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-          />
-
-          <button
-            type="submit"
-            disabled={loading || !token}
-            className="w-full bg-gradient-to-br from-primary to-primary-container text-on-primary font-headline font-bold py-4 rounded-2xl shadow-xl shadow-primary/20 hover:-translate-y-0.5 transition-all active:scale-95 flex items-center justify-center gap-2 mt-4"
-          >
-            {loading ? (
-              <LoadingSpinner size={20} />
-            ) : (
-              "REABLECER CONTRASEÑA"
-            )}
-          </button>
-        </form>
-      </div>
-    </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full h-14 bg-primary text-on-primary rounded-2xl font-headline font-bold text-base flex items-center justify-center gap-3 shadow-xl shadow-primary/10 hover:shadow-2xl hover:-translate-y-1 active:scale-95 transition-all duration-300 disabled:opacity-50"
+        >
+          ACTUALIZAR CONTRASEÑA
+          <Save size={18} />
+        </button>
+      </form>
+    </>
   );
 }
 
 export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center p-4">
-      <Suspense fallback={<LoadingSpinner size={52} fullPage />}>
-        <ResetPasswordForm />
-      </Suspense>
+      <div className="w-full max-w-md bg-white rounded-[32px] shadow-xl border border-outline-variant/20 p-8 md:p-12 animate-fade-in-up">
+        <Suspense fallback={<LoadingSpinner size={40} />}>
+          <ResetPasswordForm />
+        </Suspense>
+      </div>
     </div>
   );
 }

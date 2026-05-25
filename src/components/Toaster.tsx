@@ -1,22 +1,30 @@
 "use client";
 
 import { Toaster as SonnerToaster } from "sonner";
+import { CheckCircle2, AlertCircle, Info, TriangleAlert } from "lucide-react";
 
 export default function Toaster() {
   return (
     <SonnerToaster
-      position="bottom-right"
+      position="top-center"
       toastOptions={{
         unstyled: true,
         classNames: {
-          toast: "w-full max-w-[350px] flex items-center gap-3 p-4 rounded-2xl bg-surface border border-outline-variant/20 shadow-[0_8px_30px_rgb(31,27,20,0.1)] backdrop-blur-xl animate-in slide-in-from-bottom-2 duration-300",
-          title: "font-headline font-bold text-sm text-primary",
-          description: "font-body text-xs text-on-surface-variant",
-          success: "border-l-4 border-secondary",
-          error: "border-l-4 border-error",
-          warning: "border-l-4 border-tertiary",
-          info: "border-l-4 border-primary",
+          toast: "group w-full max-w-[420px] flex items-center gap-4 p-5 rounded-[28px] shadow-[0_20px_50px_rgba(31,27,20,0.12)] border animate-in slide-in-from-top-4 duration-500 mt-4",
+          title: "font-headline font-black text-[14px] leading-tight mb-0.5",
+          description: "font-body text-[12px] font-semibold opacity-80 leading-snug",
+          success: "bg-secondary-container border-secondary/20 text-secondary",
+          error: "bg-error-container border-error/20 text-error",
+          warning: "bg-tertiary-container border-tertiary/20 text-tertiary",
+          info: "bg-primary-container border-primary/20 text-on-primary",
+          default: "bg-surface border-outline-variant/30 text-primary",
         },
+      }}
+      icons={{
+        success: <CheckCircle2 size={22} className="shrink-0" />,
+        error: <AlertCircle size={22} className="shrink-0" />,
+        warning: <TriangleAlert size={22} className="shrink-0" />,
+        info: <Info size={22} className="shrink-0" />,
       }}
     />
   );

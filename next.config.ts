@@ -1,3 +1,4 @@
+import path from "path";
 import type { NextConfig } from "next";
 import withPWAInit from "@ducanh2912/next-pwa";
 
@@ -14,6 +15,9 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   productionBrowserSourceMaps: false,
   reactStrictMode: true,
+  experimental: {
+    outputFileTracingRoot: path.join(__dirname),
+  },
 };
 
 export default withPWA(nextConfig);

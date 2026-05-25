@@ -22,7 +22,7 @@ export default function LoginPage() {
     console.log("Iniciando login para:", email);
 
     try {
-      const response = await api.post("/auth/login", { email, password });
+      const response = await api.post("auth/login", { email, password });
       console.log("Respuesta de login exitosa:", response.data);
       const { access_token, user } = response.data;
       
@@ -61,6 +61,8 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-surface selection:bg-secondary-container/30">
+      {loading && <LoadingSpinner fullPage message="Autenticando..." />}
+      
       <div className="min-h-screen flex flex-col md:flex-row overflow-hidden">
         {/* Left Column: Hero Editorial Imagery (Web) / Top Section (Mobile) */}
         <div className="relative w-full md:w-1/2 lg:w-3/5 h-[353px] md:h-screen overflow-hidden">
@@ -140,12 +142,7 @@ export default function LoginPage() {
                 type="submit"
                 disabled={loading}
               >
-                {loading ? (
-                  <LoadingSpinner size={20} />
-                ) : (
-                  "Iniciar Sesión"
-                )}
-
+                Iniciar Sesión
               </button>
             </div>
 

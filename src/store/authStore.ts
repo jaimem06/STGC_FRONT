@@ -1,26 +1,29 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-interface User {
+interface RoleOut {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+export type UserStatus = "ACTIVO" | "INACTIVO" | "SUSPENDIDO" | "PENDIENTE";
+
+interface UserOut {
   id: string;
   email: string;
-  first_name?: string;
-  last_name?: string;
-  identifier?: string;
-  phone_number?: string;
-  suspended_from?: string;
-  suspended_until?: string;
-  role: {
-    name: string;
-    permissions: Array<{ name: string }>;
-  };
-  status: string;
+  first_name: string | null;
+  last_name: string | null;
+  identifier: string | null;
+  phone_number: string | null;
+  status: UserStatus;
+  role: RoleOut;
 }
 
 interface AuthState {
-  user: User | null;
+  user: UserOut | null;
   token: string | null;
-  setAuth: (user: User, token: string) => void;
+  setAuth: (user: UserOut, token: string) => void;
   fetchMe: () => Promise<void>;
   logout: () => void;
 }
@@ -42,16 +45,16 @@ export const useAuthStore = create<AuthState>()(
 
         try {
           const { api } = await import("@/lib/api");
-          const response = await api.get("/auth/me");
+          const response = await api.get("auth/me");
           set({ user: response.data });
         } catch (error) {
           console.error("Error fetching user profile:", error);
-          // If it's a 401, the interceptor will handle logout
         }
       },
       logout: () => {
         if (typeof window !== "undefined") {
           localStorage.removeItem("token");
+          // Use a more Next.js friendly way if possible, but window.location.href works for hard reset
           window.location.href = "/login";
         }
         set({ user: null, token: null });
