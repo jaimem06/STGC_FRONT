@@ -35,7 +35,7 @@ const TableRow = React.memo(function TableRow({
       {columns.map((col, colIdx) => (
         <td
           key={colIdx}
-          className={`px-4 md:px-6 py-2.5 ${col.className || ""} ${
+          className={`px-3 md:px-4 py-1.5 ${col.className || ""} ${
             col.hideOnMobile ? "hidden md:table-cell" : ""
           } ${
             col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : ""
@@ -88,7 +88,7 @@ export default function Table<T>({
 
   return (
     <div className="flex flex-col space-y-4">
-      <div className="bg-white rounded-[32px] shadow-sm border border-outline-variant/10 overflow-hidden">
+      <div className="bg-white rounded-[20px] shadow-sm border border-outline-variant/10 overflow-hidden">
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-auto min-w-full text-left border-collapse">
             <thead>
@@ -97,7 +97,7 @@ export default function Table<T>({
 
                   <th
                     key={idx}
-                    className={`px-4 md:px-5 py-4 text-[12px] font-bold text-surface uppercase tracking-[0.2em] whitespace-nowrap ${col.className || ""} ${
+                    className={`px-3 md:px-4 py-3 text-[11px] font-bold text-surface uppercase tracking-[0.2em] whitespace-nowrap ${col.className || ""} ${
                       col.hideOnMobile ? "hidden md:table-cell" : ""
                     } ${
                       col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : ""

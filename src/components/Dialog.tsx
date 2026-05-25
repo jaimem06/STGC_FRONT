@@ -24,21 +24,21 @@ export default function Dialog({
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] animate-in fade-in duration-300" />
         <RadixDialog.Content 
-          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-[40px] shadow-2xl p-8 border border-outline-variant/20 max-w-md w-[90vw] z-[101] animate-in zoom-in-95 duration-200 outline-none"
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-[32px] shadow-2xl p-6 border border-outline-variant/20 max-w-md w-[90vw] z-[101] animate-in zoom-in-95 duration-200 outline-none max-h-[90vh] overflow-y-auto"
         >
-          <div className="flex justify-between items-start mb-6">
+          <div className="flex justify-between items-start mb-4">
             <div>
-              <RadixDialog.Title className="text-2xl font-headline font-extrabold text-primary tracking-tight">
+              <RadixDialog.Title className="text-xl font-headline font-extrabold text-primary tracking-tight">
                 {title}
               </RadixDialog.Title>
               {description && (
-                <RadixDialog.Description className="text-xs text-on-surface-variant font-medium mt-1">
+                <RadixDialog.Description className="text-[11px] text-on-surface-variant font-medium mt-0.5">
                   {description}
                 </RadixDialog.Description>
               )}
             </div>
-            <RadixDialog.Close className="p-2 hover:bg-surface-container rounded-full text-outline transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/20">
-              <X size={20} />
+            <RadixDialog.Close className="p-1.5 hover:bg-surface-container rounded-full text-outline transition-colors outline-none">
+              <X size={18} />
             </RadixDialog.Close>
           </div>
 

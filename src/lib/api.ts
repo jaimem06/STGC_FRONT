@@ -1,6 +1,9 @@
 import axios from "axios";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://auth-service-w3lo.onrender.com/api";
+let API_URL = process.env.NEXT_PUBLIC_API_URL || "https://auth-service-w3lo.onrender.com/api/";
+if (!API_URL.endsWith("/")) {
+  API_URL += "/";
+}
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -13,7 +16,7 @@ export const api = axios.create({
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
     const token = localStorage.getItem("token");
-    if (token) {
+    if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
   }
@@ -28,8 +31,9 @@ api.interceptors.response.use(
       if (typeof window !== "undefined") {
         localStorage.removeItem("token");
         
-        // Solo redirigir si NO estamos ya en la página de login
-        if (window.location.pathname !== "/login") {
+        // Only redirect if NOT already on login/recovery/reset pages
+        const publicPaths = ["/login", "/password-recovery", "/reset-password"];
+        if (!publicPaths.some(path => window.location.pathname.startsWith(path))) {
           window.location.href = "/login";
         }
       }
