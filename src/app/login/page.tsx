@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api } from "@/lib/auth-service";
+import { ENDPOINTS } from "@/lib/endpoints";
 import { useAuthStore } from "@/store/authStore";
 import { toast } from "sonner";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -19,11 +20,9 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    console.log("Iniciando login para:", email);
 
     try {
-      const response = await api.post("auth/login", { email, password });
-      console.log("Respuesta de login exitosa:", response.data);
+      const response = await api.post(ENDPOINTS.AUTH.LOGIN, { email, password });
       const { access_token, user } = response.data;
       
       setAuth(user, access_token);
@@ -34,7 +33,6 @@ export default function LoginPage() {
         router.push("/dashboard/users");
       }, 500);
     } catch (err: any) {
-      console.error("Error capturado en login:", err);
       const status = err.response?.status;
       const detail = err.response?.data?.detail;
 

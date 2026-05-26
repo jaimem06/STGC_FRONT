@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { ENDPOINTS } from "@/lib/endpoints";
 
 interface RoleOut {
   id: string;
@@ -44,11 +45,11 @@ export const useAuthStore = create<AuthState>()(
         if (!token) return;
 
         try {
-          const { api } = await import("@/lib/api");
-          const response = await api.get("auth/me");
+          const { api } = await import("@/lib/auth-service");
+          const response = await api.get(ENDPOINTS.AUTH.ME);
           set({ user: response.data });
         } catch (error) {
-          console.error("Error fetching user profile:", error);
+          // Handle or ignore error silently for production
         }
       },
       logout: () => {

@@ -32,7 +32,7 @@ export default function LoadingSpinner({
       <div className="relative flex items-center justify-center">
         {/* Decorative Ring */}
         <div 
-          className="absolute inset-0 rounded-full border-2 border-primary/5 animate-pulse"
+          className="absolute inset-0 rounded-full animate-pulse"
           style={{ width: size + 16, height: size + 16, left: -8, top: -8 }}
         />
         
@@ -42,7 +42,7 @@ export default function LoadingSpinner({
           className="relative shrink-0 flex items-center justify-center rounded-full animate-[bounce_1.5s_infinite]"
         >
           <Image
-            src="/loader cafe.svg"
+            src="/loader_cafe.svg"
             alt="Cargando..."
             width={size}
             height={size}

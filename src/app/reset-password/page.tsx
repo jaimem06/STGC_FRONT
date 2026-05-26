@@ -3,7 +3,8 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { api } from "@/lib/api";
+import { api } from "@/lib/auth-service";
+import { ENDPOINTS } from "@/lib/endpoints";
 import { PasswordResetConfirmSchema, PasswordResetConfirmInput } from "@/lib/schemas";
 import { toast } from "sonner";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -27,13 +28,13 @@ function ResetPasswordForm() {
   const onSubmit = async (data: PasswordResetConfirmInput) => {
     const result = PasswordResetConfirmSchema.safeParse(data);
     if (!result.success) {
-      toast.error(result.error.errors[0].message);
+      toast.error(result.error.issues[0].message);
       return;
     }
 
     setLoading(true);
     try {
-      await api.post("auth/reset-password", data);
+      await api.post(ENDPOINTS.AUTH.RESET_PASSWORD, data);
       toast.success("Contraseña actualizada con éxito.");
       router.push("/login");
     } catch (err: any) {

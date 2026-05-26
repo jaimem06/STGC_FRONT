@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { api } from "@/lib/api";
+import { api } from "@/lib/auth-service";
 import { PasswordResetRequestSchema, PasswordResetRequestInput } from "@/lib/schemas";
+import { ENDPOINTS } from "@/lib/endpoints";
 import { toast } from "sonner";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import Input from "@/components/Input";
@@ -26,7 +27,7 @@ export default function PasswordRecoveryPage() {
 
     setLoading(true);
     try {
-      await api.post("auth/password-recovery", data);
+      await api.post(ENDPOINTS.AUTH.PASSWORD_RECOVERY, data);
       setSent(true);
       toast.success("Si el correo existe, recibirás un enlace pronto.");
     } catch (err: any) {

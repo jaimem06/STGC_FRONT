@@ -13,13 +13,17 @@ import {
   ChevronLeft,
   Menu,
   X,
-  User as UserIcon
+  User as UserIcon,
+  Box,
+  History
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/uiStore";
 
 const menuItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Inventario", href: "/dashboard/inventory", icon: Box },
+  { name: "Trazabilidad", href: "/dashboard/traceability", icon: History },
   { name: "Usuarios", href: "/dashboard/users", icon: Users },
   { name: "Roles", href: "/dashboard/roles", icon: ShieldCheck },
   { name: "Configuración", href: "/dashboard/settings", icon: Settings },

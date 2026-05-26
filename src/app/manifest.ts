@@ -11,17 +11,17 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#442a22",
     icons: [
       {
-        src: "/loader cafe.svg",
+        src: "/loader_cafe.svg",
         sizes: "any",
         type: "image/svg+xml",
       },
       {
-        src: "/loader cafe.svg",
+        src: "/loader_cafe.svg",
         sizes: "192x192",
         type: "image/svg+xml",
       },
       {
-        src: "/loader cafe.svg",
+        src: "/loader_cafe.svg",
         sizes: "512x512",
         type: "image/svg+xml",
       },
