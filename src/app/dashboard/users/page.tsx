@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { api } from "@/lib/api";
+import { api } from "@/lib/auth-service";
+import { ENDPOINTS } from "@/lib/endpoints";
 import { 
   UserPlus, 
   Shield, 
@@ -102,8 +103,8 @@ export default function UsersPage() {
   const fetchData = useCallback(async () => {
     try {
       const [usersRes, rolesRes] = await Promise.all([
-        api.get("users/"),
-        api.get("roles/")
+        api.get(ENDPOINTS.AUTH.USERS.BASE),
+        api.get(ENDPOINTS.AUTH.ROLES.BASE)
       ]);
       setUsers(usersRes.data);
       setRoles(rolesRes.data);
@@ -128,7 +129,7 @@ export default function UsersPage() {
   const handleCreateUser = async (data: UserCreateInput) => {
     setIsActionLoading(true);
     try {
-      await api.post("auth/register", data);
+      await api.post(ENDPOINTS.AUTH.REGISTER, data);
       toast.success("Usuario creado exitosamente");
       setIsCreateModalOpen(false);
       resetCreate();
@@ -147,7 +148,7 @@ export default function UsersPage() {
     setIsActionLoading(true);
     setStatusConfirm(null);
     try {
-      await api.patch(`users/${user.id}`, { status: targetStatus });
+      await api.patch(ENDPOINTS.AUTH.USERS.BY_ID(user.id), { status: targetStatus });
       toast.success(`Usuario ${user.first_name || user.email} marcado como ${targetStatus.toLowerCase()}`);
       fetchData();
     } catch (err: any) {
@@ -160,7 +161,7 @@ export default function UsersPage() {
   const handleUpdateUserRole = async (userId: string, roleName: string) => {
     setIsActionLoading(true);
     try {
-      await api.patch(`users/${userId}`, { role_name: roleName });
+      await api.patch(ENDPOINTS.AUTH.USERS.BY_ID(userId), { role_name: roleName });
       toast.success("Rol actualizado correctamente");
       setEditingUser(null);
       fetchData();

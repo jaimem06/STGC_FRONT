@@ -77,9 +77,81 @@ export const RoleCreateSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
+// --- Inventory & Traceability Schemas ---
+
+export const CalidadCafeEnum = z.enum(["ALTA", "MEDIA", "BAJA"]);
+export const ClasificacionInsumoEnum = z.enum(["QUIMICO_FERTILIZANTE", "QUIMICO_FUNGICIDA", "ORGANICO"]);
+export const EstadoProductoEnum = z.enum([
+  "DISPONIBLE",
+  "AGOTADO",
+  "STOCK_BAJO",
+  "INACTIVO",
+  "EN_TRANSITO",
+  "BLOQUEADO",
+  "CADUCADO",
+]);
+export const FaseCafeEnum = z.enum(["PULPA", "DESPULPADO", "SECADO", "TOSTADO", "MOLIDO"]);
+export const TipoElementoEnum = z.enum(["INSUMO", "PRODUCTO", "CAFE_PROCESADO"]);
+export const TipoMovimientoEnum = z.enum(["ENTRADA", "SALIDA"]);
+export const UnidadMedidaEnum = z.enum(["QUINTALES", "ARROBAS", "LIBRAS"]);
+
+export const CreateInventarioItemSchema = z.object({
+  sku: z.string().min(1, "El SKU es requerido"),
+  nombre: z.string().min(1, "El nombre es requerido"),
+  descripcion: z.string().nullable().optional(),
+  tipo: TipoElementoEnum,
+  estado: EstadoProductoEnum,
+  unidad_medida: UnidadMedidaEnum,
+  precio: z.number().min(0, "El precio debe ser mayor o igual a 0"),
+  fecha_caducidad: z.string().nullable().optional(),
+});
+
+export const InventarioItemSchema = CreateInventarioItemSchema.extend({
+  id: z.string().uuid(),
+  cantidad: z.number(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const MovimientoStockSchema = z.object({
+  id: z.string().uuid().optional(),
+  item_id: z.string().uuid("ID de ítem inválido"),
+  lote_id: z.string().uuid().nullable().optional(),
+  cantidad: z.number().positive("La cantidad debe ser positiva"),
+  tipo: TipoMovimientoEnum,
+  fecha: z.string().optional(),
+  motivo: z.string().min(1, "El motivo es requerido"),
+});
+
+export const LoteCafeSchema = z.object({
+  id: z.string().uuid(),
+  variedad: z.string().min(1, "La variedad es requerida"),
+  fase: FaseCafeEnum,
+  cantidad_producida: z.number(),
+  costo_produccion: z.number(),
+  unidad_medida: UnidadMedidaEnum,
+  calidad: CalidadCafeEnum,
+  codigo_trazabilidad: z.string().uuid(),
+  fecha_creacion: z.string(),
+  lote_anterior_id: z.string().uuid().nullable().optional(),
+});
+
 export type LoginInput = z.infer<typeof LoginSchema>;
 export type UserCreateInput = z.infer<typeof UserCreateSchema>;
 export type UserUpdateInput = z.infer<typeof UserUpdateSchema>;
 export type PasswordResetRequestInput = z.infer<typeof PasswordResetRequestSchema>;
 export type PasswordResetConfirmInput = z.infer<typeof PasswordResetConfirmSchema>;
 export type RoleCreateInput = z.infer<typeof RoleCreateSchema>;
+
+// Inventory types
+export type CalidadCafe = z.infer<typeof CalidadCafeEnum>;
+export type ClasificacionInsumo = z.infer<typeof ClasificacionInsumoEnum>;
+export type EstadoProducto = z.infer<typeof EstadoProductoEnum>;
+export type FaseCafe = z.infer<typeof FaseCafeEnum>;
+export type TipoElemento = z.infer<typeof TipoElementoEnum>;
+export type TipoMovimiento = z.infer<typeof TipoMovimientoEnum>;
+export type UnidadMedida = z.infer<typeof UnidadMedidaEnum>;
+export type CreateInventarioItemInput = z.infer<typeof CreateInventarioItemSchema>;
+export type InventarioItem = z.infer<typeof InventarioItemSchema>;
+export type MovimientoStockInput = z.infer<typeof MovimientoStockSchema>;
+export type LoteCafe = z.infer<typeof LoteCafeSchema>;

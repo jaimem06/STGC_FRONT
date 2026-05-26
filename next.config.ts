@@ -13,11 +13,11 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // Moved from experimental to root in newer Next.js versions
+  // @ts-ignore: outputFileTracingRoot is valid at runtime but might be missing in types
+  outputFileTracingRoot: path.join(__dirname),
   productionBrowserSourceMaps: false,
   reactStrictMode: true,
-  experimental: {
-    outputFileTracingRoot: path.join(__dirname),
-  },
 };
 
 export default withPWA(nextConfig);

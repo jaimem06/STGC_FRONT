@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
-import { api } from "@/lib/api";
+import { api } from "@/lib/auth-service";
+import { ENDPOINTS } from "@/lib/endpoints";
 import { 
   ShieldCheck, 
   Plus, 
@@ -41,7 +42,7 @@ export default function RolesPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const response = await api.get("roles/");
+      const response = await api.get(ENDPOINTS.AUTH.ROLES.BASE);
       setRoles(response.data);
     } catch (err: any) {
       toast.error("Error al cargar roles");
@@ -77,10 +78,10 @@ export default function RolesPage() {
     setIsActionLoading(true);
     try {
       if (editingRole) {
-        await api.put(`roles/${editingRole.id}`, data);
+        await api.put(ENDPOINTS.AUTH.ROLES.BY_ID(editingRole.id), data);
         toast.success("Rol actualizado con éxito");
       } else {
-        await api.post("roles/", data);
+        await api.post(ENDPOINTS.AUTH.ROLES.BASE, data);
         toast.success("Rol creado con éxito");
       }
       setIsModalOpen(false);
@@ -96,7 +97,7 @@ export default function RolesPage() {
     if (!roleToDelete) return;
     setIsActionLoading(true);
     try {
-      await api.delete(`roles/${roleToDelete}`);
+      await api.delete(ENDPOINTS.AUTH.ROLES.BY_ID(roleToDelete));
       toast.success("Rol eliminado exitosamente");
       fetchData();
     } catch (err: any) {
