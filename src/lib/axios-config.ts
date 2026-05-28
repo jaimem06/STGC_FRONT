@@ -29,7 +29,7 @@ export const applyInterceptors = (instance: AxiosInstance) => {
     (error) => {
       const status = error.response?.status;
 
-      if (status === 401 && typeof window !== "undefined") {
+      if (status === 401 && typeof window !== "undefined" && !(error.config as any)?._skipAuthInterceptor) {
         const publicPages = ["/login", "/password-recovery", "/reset-password"];
         const pathname = window.location.pathname;
 

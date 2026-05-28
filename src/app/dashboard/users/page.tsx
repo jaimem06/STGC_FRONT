@@ -21,12 +21,14 @@ import {
   SlidersHorizontal,
   Phone,
   Fingerprint,
+  IdCard,
+  Globe,
   Users as UsersIcon,
   TrendingUp,
   ShieldAlert
 } from "lucide-react";
 import { UserStatus } from "@/store/authStore";
-import { UserCreateSchema, UserCreateInput } from "@/lib/schemas";
+import { UserCreateSchema, UserCreateInput, UserUpdateSchema, UserUpdateInput } from "@/lib/schemas";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import Table from "@/components/Table";
 import Input from "@/components/Input";
@@ -78,11 +80,13 @@ export default function UsersPage() {
 
   // Modal & Confirm States
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserOut | null>(null);
   const [statusConfirm, setStatusConfirm] = useState<{
     user: UserOut;
     targetStatus: UserStatus;
   } | null>(null);
+  const [idType, setIdType] = useState<"CEDULA" | "PASAPORTE">("CEDULA");
 
   const { 
     register: registerCreate, 
@@ -94,11 +98,28 @@ export default function UsersPage() {
   } = useForm({
     resolver: zodResolver(UserCreateSchema),
     defaultValues: {
-      status: "ACTIVO"
+      status: "ACTIVO",
+      id_type: "CEDULA"
     }
   });
 
+  const { 
+    register: registerEdit, 
+    handleSubmit: handleSubmitEdit, 
+    reset: resetEdit, 
+    setValue: setEditValue, 
+    watch: watchEdit,
+    formState: { errors: errorsEdit }
+  } = useForm({
+    resolver: zodResolver(UserUpdateSchema)
+  });
+
   const selectedRoleName = watchCreate("role_name");
+  const editRoleName = watchEdit("role_name");
+
+  useEffect(() => {
+    setCreateValue("id_type", idType);
+  }, [idType, setCreateValue]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -129,13 +150,35 @@ export default function UsersPage() {
   const handleCreateUser = async (data: UserCreateInput) => {
     setIsActionLoading(true);
     try {
-      await api.post(ENDPOINTS.AUTH.REGISTER, data);
+      const { id_type, ...apiData } = data as any;
+      await api.post(ENDPOINTS.AUTH.REGISTER, apiData, { _skipAuthInterceptor: true } as any);
       toast.success("Usuario creado exitosamente");
       setIsCreateModalOpen(false);
       resetCreate();
       fetchData();
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Error al crear usuario");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleUpdateUser = async (data: UserUpdateInput) => {
+    if (!editingUser) return;
+    setIsActionLoading(true);
+    try {
+      // Filtrar campos vacíos para no enviarlos si no cambiaron
+      const filteredData = Object.fromEntries(
+        Object.entries(data).filter(([_, v]) => v !== "" && v !== null && v !== undefined)
+      );
+      
+      await api.patch(ENDPOINTS.AUTH.USERS.BY_ID(editingUser.id), filteredData);
+      toast.success("Usuario actualizado exitosamente");
+      setIsEditModalOpen(false);
+      setEditingUser(null);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Error al actualizar usuario");
     } finally {
       setIsActionLoading(false);
     }
@@ -158,18 +201,16 @@ export default function UsersPage() {
     }
   };
 
-  const handleUpdateUserRole = async (userId: string, roleName: string) => {
-    setIsActionLoading(true);
-    try {
-      await api.patch(ENDPOINTS.AUTH.USERS.BY_ID(userId), { role_name: roleName });
-      toast.success("Rol actualizado correctamente");
-      setEditingUser(null);
-      fetchData();
-    } catch (err: any) {
-      toast.error("Error al actualizar rol");
-    } finally {
-      setIsActionLoading(false);
-    }
+  const handleOpenEdit = (user: UserOut) => {
+    setEditingUser(user);
+    resetEdit({
+      email: user.email,
+      phone_number: user.phone_number || "",
+      identifier: user.identifier || "",
+      role_name: user.role.name,
+      status: user.status
+    });
+    setIsEditModalOpen(true);
   };
 
   const filteredUsers = useMemo(() => {
@@ -216,16 +257,9 @@ export default function UsersPage() {
     {
       header: "Cargo",
       accessor: (user: UserOut) => (
-        <button 
-          onClick={() => setEditingUser(user)}
-          className="group flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-surface-container transition-all"
-          title="Toca para editar cargo"
-        >
-          <span className="text-xs font-bold text-primary border-b border-dashed border-outline-variant/60 group-hover:border-secondary group-hover:text-secondary transition-all">
-            {user.role.name}
-          </span>
-          <Edit2 size={10} className="text-outline opacity-40 group-hover:opacity-100 group-hover:text-secondary transition-all" />
-        </button>
+        <span className="text-xs font-bold text-primary">
+          {user.role.name}
+        </span>
       ),
     },
     {
@@ -245,6 +279,13 @@ export default function UsersPage() {
       align: "right" as const,
       accessor: (user: UserOut) => (
         <div className="flex items-center justify-end gap-0.5">
+          <button 
+            onClick={() => handleOpenEdit(user)}
+            className="p-1.5 text-primary hover:bg-primary/5 rounded-lg transition-all"
+            title="Editar Usuario"
+          >
+            <Edit2 size={16} />
+          </button>
           {user.status !== "ACTIVO" && (
             <button 
               onClick={() => setStatusConfirm({ user, targetStatus: "ACTIVO" })}
@@ -404,28 +445,60 @@ export default function UsersPage() {
         description="Registro de nuevo integrante del equipo."
       >
         <form onSubmit={handleSubmitCreate((data) => handleCreateUser(data as unknown as UserCreateInput))} className="space-y-4 pt-2">
+          {/* Selector de Tipo de Documento */}
+          <div className="flex flex-col gap-2">
+            <label className="text-[10px] font-black text-primary uppercase tracking-[0.15em] px-1">
+              Tipo de Identificación
+            </label>
+            <div className="flex p-1 bg-surface-container rounded-xl gap-1">
+              <button
+                type="button"
+                onClick={() => setIdType("CEDULA")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-bold transition-all ${
+                  idType === "CEDULA" 
+                    ? "bg-white text-primary shadow-sm" 
+                    : "text-outline hover:text-primary"
+                }`}
+              >
+                <IdCard size={14} /> CÉDULA
+              </button>
+              <button
+                type="button"
+                onClick={() => setIdType("PASAPORTE")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-bold transition-all ${
+                  idType === "PASAPORTE" 
+                    ? "bg-white text-primary shadow-sm" 
+                    : "text-outline hover:text-primary"
+                }`}
+              >
+                <Globe size={14} /> PASAPORTE
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <Input 
-              label="Nombres" 
+              label="Nombres *" 
               required 
               {...registerCreate("first_name")} 
               error={errorsCreate.first_name?.message}
             />
             <Input 
-              label="Apellidos" 
+              label="Apellidos *" 
               required 
               {...registerCreate("last_name")} 
               error={errorsCreate.last_name?.message}
             />
             <Input 
-              label="ID / Cédula" 
-              icon={Fingerprint} 
+              label={idType === "CEDULA" ? "Número de Cédula *" : "Número de Pasaporte *"} 
+              icon={idType === "CEDULA" ? IdCard : Globe} 
+              placeholder={idType === "CEDULA" ? "0000000000" : "A00000000"}
               required 
               {...registerCreate("identifier")} 
               error={errorsCreate.identifier?.message}
             />
             <Input 
-              label="Teléfono" 
+              label="Teléfono *" 
               icon={Phone} 
               required
               placeholder="Ej: 0980885416 o +593..."
@@ -434,7 +507,7 @@ export default function UsersPage() {
             />
             <div className="col-span-2">
               <Input 
-                label="Correo Corporativo" 
+                label="Correo Corporativo *" 
                 icon={Mail} 
                 type="email" 
                 required 
@@ -443,7 +516,7 @@ export default function UsersPage() {
               />
             </div>
             <Input 
-              label="Clave Temporal" 
+              label="Clave Temporal *" 
               icon={Lock} 
               type="password" 
               required 
@@ -468,27 +541,92 @@ export default function UsersPage() {
         </form>
       </Dialog>
 
-      {/* Edit Role Modal */}
+      {/* Edit User Modal */}
       <Dialog
-        isOpen={!!editingUser}
-        onOpenChange={() => setEditingUser(null)}
-        title="Cambiar Cargo"
-        description={`Actualiza el rol de ${editingUser?.first_name || editingUser?.email}`}
+        isOpen={isEditModalOpen}
+        onOpenChange={setIsEditModalOpen}
+        title="Editar Empleado"
+        description={`Actualizando datos de ${editingUser?.first_name || editingUser?.email}`}
       >
-        <div className="space-y-6 pt-4">
-          <Select
-            label="Nuevo Cargo"
-            value={editingUser?.role.name || ""}
-            options={roles.map(r => ({ value: r.name, label: r.name }))}
-            onValueChange={(val) => editingUser && handleUpdateUserRole(editingUser.id, val)}
-          />
-          <button 
-            onClick={() => setEditingUser(null)}
-            className="w-full h-11 rounded-xl border border-outline-variant/30 font-bold text-outline text-xs uppercase tracking-widest hover:bg-surface-container transition-colors"
-          >
-            Cerrar
-          </button>
-        </div>
+        <form onSubmit={handleSubmitEdit(handleUpdateUser)} className="space-y-4 pt-2">
+          <p className="text-[10px] text-primary/60 font-semibold italic px-1">
+            * Deja la contraseña en blanco para no cambiarla.
+          </p>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <Input 
+                label="Correo Corporativo" 
+                icon={Mail} 
+                type="email" 
+                {...registerEdit("email")} 
+                error={errorsEdit.email?.message}
+              />
+            </div>
+            
+            <Input 
+              label="Identificación" 
+              icon={Fingerprint} 
+              {...registerEdit("identifier")} 
+              error={errorsEdit.identifier?.message}
+            />
+
+            <Input 
+              label="Teléfono" 
+              icon={Phone} 
+              {...registerEdit("phone_number")} 
+              error={errorsEdit.phone_number?.message}
+            />
+
+            <Select
+              label="Cargo"
+              value={editRoleName || ""}
+              options={roles.map(r => ({ value: r.name, label: r.name }))}
+              onValueChange={(val) => setEditValue("role_name", val)}
+              error={errorsEdit.role_name?.message}
+            />
+
+            <Select
+              label="Estado"
+              value={watchEdit("status") || ""}
+              options={[
+                { value: "ACTIVO", label: "Activo" },
+                { value: "INACTIVO", label: "Inactivo" },
+                { value: "SUSPENDIDO", label: "Suspendido" },
+                { value: "PENDIENTE", label: "Pendiente" },
+              ]}
+              onValueChange={(val) => setEditValue("status", val as any)}
+              error={errorsEdit.status?.message}
+            />
+
+            <div className="col-span-2">
+              <Input 
+                label="Nueva Contraseña" 
+                icon={Lock} 
+                type="password" 
+                placeholder="••••••••"
+                {...registerEdit("password")} 
+                error={errorsEdit.password?.message}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button 
+              type="button"
+              onClick={() => setIsEditModalOpen(false)}
+              className="flex-1 h-11 rounded-xl border border-outline-variant/30 font-bold text-outline text-xs uppercase tracking-widest hover:bg-surface-container transition-colors"
+            >
+              Cancelar
+            </button>
+            <button 
+              type="submit"
+              className="flex-1 h-11 bg-primary text-on-primary rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg hover:shadow-xl transition-all"
+            >
+              GUARDAR CAMBIOS
+            </button>
+          </div>
+        </form>
       </Dialog>
 
       {/* Status Change Confirmation */}

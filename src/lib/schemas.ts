@@ -43,16 +43,31 @@ export const UserCreateSchema = z.object({
   last_name: z.string()
     .min(1, "El apellido es requerido")
     .regex(nameRegex, "El apellido solo puede contener letras"),
+  id_type: z.enum(["CEDULA", "PASAPORTE"]).default("CEDULA"),
   identifier: z.string()
-    .min(1, "La identificación es requerida")
-    .refine((val) => {
-      if (/^\d{10}$/.test(val)) return validateEcuadorianId(val);
-      return identifierRegex.test(val);
-    }, "Identificación Inválida"),
+    .min(1, "La identificación es requerida"),
   phone_number: z.string()
     .min(1, "El teléfono es requerido")
     .regex(phoneRegex, "Número de teléfono Inválido"),
   status: z.enum(["ACTIVO", "INACTIVO", "SUSPENDIDO", "PENDIENTE"]).default("ACTIVO"),
+}).superRefine((data, ctx) => {
+  if (data.id_type === "CEDULA") {
+    if (!validateEcuadorianId(data.identifier)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Cédula Ecuatoriana Inválida",
+        path: ["identifier"],
+      });
+    }
+  } else if (data.id_type === "PASAPORTE") {
+    if (!identifierRegex.test(data.identifier)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Pasaporte Inválido (6-15 caracteres alfanuméricos)",
+        path: ["identifier"],
+      });
+    }
+  }
 });
 
 export const UserUpdateSchema = z.object({
@@ -60,6 +75,7 @@ export const UserUpdateSchema = z.object({
   status: z.enum(["ACTIVO", "INACTIVO", "SUSPENDIDO", "PENDIENTE"]).nullable().optional(),
   email: z.string().email("Correo electrónico inválido").nullable().optional(),
   phone_number: z.string().regex(phoneRegex, "Número de teléfono inválido").nullable().optional(),
+  identifier: z.string().optional(),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres").nullable().optional(),
 });
 
@@ -73,8 +89,14 @@ export const PasswordResetConfirmSchema = z.object({
 });
 
 export const RoleCreateSchema = z.object({
-  name: z.string().min(1, "El nombre del rol es requerido").transform(v => v.toUpperCase()),
-  description: z.string().nullable().optional(),
+  name: z.string()
+    .min(5, "El nombre del rol debe tener al menos 5 caracteres")
+    .transform(v => v.toUpperCase())
+    .refine(v => /^[A-Z_]+$/.test(v), "Solo se permiten letras y guiones bajos (_)"),
+  description: z.string()
+    .min(1, "La descripción es requerida")
+    .refine(v => /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s\.,;:'"()\-]+$/.test(v), "Solo se permite texto")
+    .refine(v => v.trim().split(/\s+/).length >= 10, "Mínimo 10 palabras"),
 });
 
 // --- Inventory & Traceability Schemas ---

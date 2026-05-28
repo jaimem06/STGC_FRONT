@@ -1,6 +1,8 @@
 export const ENDPOINTS = {
   AUTH: {
-    BASE_URL: process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || "",
+    BASE_URL: process.env.NEXT_PUBLIC_AUTH_SERVICE_URL
+      ? `${process.env.NEXT_PUBLIC_AUTH_SERVICE_URL.replace(/\/$/, "")}/`
+      : "",
     LOGIN: "auth/login",
     ME: "auth/me",
     REGISTER: "auth/register",
@@ -16,7 +18,9 @@ export const ENDPOINTS = {
     },
   },
   INVENTORY: {
-    BASE_URL: process.env.NEXT_PUBLIC_INVENTORY_SERVICE_URL || "",
+    BASE_URL: process.env.NEXT_PUBLIC_INVENTORY_SERVICE_URL
+      ? `${process.env.NEXT_PUBLIC_INVENTORY_SERVICE_URL.replace(/\/$/, "")}/`
+      : "",
     ITEMS: "inventario",
     ITEM_BY_ID: (id: string) => `inventario/${id}`,
     MOVEMENTS: "inventario/movimientos",
