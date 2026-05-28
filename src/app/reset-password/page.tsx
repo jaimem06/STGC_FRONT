@@ -9,10 +9,11 @@ import { PasswordResetConfirmSchema, PasswordResetConfirmInput } from "@/lib/sch
 import { toast } from "sonner";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import Input from "@/components/Input";
-import { Lock, Save, AlertCircle } from "lucide-react";
+import { Lock, Save, AlertCircle, Eye, EyeOff } from "lucide-react";
 
 function ResetPasswordForm() {
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
@@ -81,9 +82,18 @@ function ResetPasswordForm() {
         <Input
           label="Nueva Contraseña"
           icon={Lock}
-          type="password"
+          type={showPassword ? "text" : "password"}
           placeholder="••••••••"
           {...register("new_password")}
+          rightElement={
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="p-1 text-outline hover:text-primary transition-colors"
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          }
         />
 
         <button

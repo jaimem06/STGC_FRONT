@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { api } from "@/lib/auth-service";
 import { ENDPOINTS } from "@/lib/endpoints";
 import { 
@@ -38,7 +39,9 @@ export default function RolesPage() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
 
-  const { register, handleSubmit, reset, setValue } = useForm<RoleCreateInput>();
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<RoleCreateInput>({
+    resolver: zodResolver(RoleCreateSchema)
+  });
 
   const fetchData = useCallback(async () => {
     try {
@@ -69,12 +72,6 @@ export default function RolesPage() {
   };
 
   const onSubmit = async (data: RoleCreateInput) => {
-    const result = RoleCreateSchema.safeParse(data);
-    if (!result.success) {
-      toast.error(result.error.issues[0].message);
-      return;
-    }
-
     setIsActionLoading(true);
     try {
       if (editingRole) {
@@ -229,14 +226,18 @@ export default function RolesPage() {
               required
               placeholder="EJ: SUPERVISOR"
               {...register("name")}
+              error={errors.name?.message}
             />
             <div className="space-y-1.5">
               <label className="font-label text-[10px] font-bold text-outline uppercase tracking-widest ml-1">Descripción de Funciones</label>
               <textarea
-                className="w-full min-h-[80px] bg-surface-container border border-outline-variant/30 rounded-xl p-3 font-body text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+                className={`w-full min-h-[80px] bg-surface-container border ${errors.description ? 'border-error' : 'border-outline-variant/30'} rounded-xl p-3 font-body text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none`}
                 placeholder="Detalla las responsabilidades del cargo..."
                 {...register("description")}
               />
+              {errors.description && (
+                <p className="text-[10px] text-error font-medium ml-1">{errors.description.message}</p>
+              )}
             </div>
           </div>
 

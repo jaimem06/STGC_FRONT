@@ -7,6 +7,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   icon?: LucideIcon;
   error?: string;
+  rightElement?: React.ReactNode;
 }
 
 export default function Input({
@@ -14,6 +15,7 @@ export default function Input({
   icon: Icon,
   error,
   className = "",
+  rightElement,
   ...props
 }: InputProps) {
   return (
@@ -31,13 +33,18 @@ export default function Input({
           />
         )}
         <input
-          className={`w-full ${Icon ? "pl-10" : "px-4"} pr-4 py-2 bg-white border rounded-xl outline-none transition-all font-body text-xs shadow-sm placeholder:text-outline-variant/60 ${
+          className={`w-full ${Icon ? "pl-10" : "px-4"} ${rightElement ? "pr-10" : "pr-4"} py-2 bg-white border rounded-xl outline-none transition-all font-body text-xs shadow-sm placeholder:text-outline-variant/60 ${
             error 
               ? "border-error focus:ring-2 focus:ring-error/10" 
               : "border-outline-variant/20 focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
           }`}
           {...props}
         />
+        {rightElement && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center">
+            {rightElement}
+          </div>
+        )}
       </div>
       {error && (
         <p className="text-[9px] font-bold text-error ml-1 animate-in fade-in slide-in-from-top-1">
