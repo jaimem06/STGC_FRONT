@@ -74,8 +74,15 @@ export const UserUpdateSchema = z.object({
   role_name: z.string().nullable().optional(),
   status: z.enum(["ACTIVO", "INACTIVO", "SUSPENDIDO", "PENDIENTE"]).nullable().optional(),
   email: z.string().email("Correo electrónico inválido").nullable().optional(),
+  first_name: z.string()
+    .min(1, "El nombre es requerido")
+    .regex(nameRegex, "El nombre solo puede contener letras")
+    .nullable().optional(),
+  last_name: z.string()
+    .min(1, "El apellido es requerido")
+    .regex(nameRegex, "El apellido solo puede contener letras")
+    .nullable().optional(),
   phone_number: z.string().regex(phoneRegex, "Número de teléfono inválido").nullable().optional(),
-  identifier: z.string().optional(),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres").nullable().optional(),
 });
 
@@ -126,6 +133,15 @@ export const CreateInventarioItemSchema = z.object({
   unidad_medida: UnidadMedidaEnum,
   precio: z.number().min(0, "El precio debe ser mayor o igual a 0"),
   fecha_caducidad: z.string().nullable().optional(),
+}).refine((data) => {
+  if (!data.fecha_caducidad) return true;
+  const expiryDate = new Date(data.fecha_caducidad);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return expiryDate >= today;
+}, {
+  message: "La fecha de caducidad no puede ser anterior a hoy",
+  path: ["fecha_caducidad"],
 });
 
 export const InventarioItemSchema = CreateInventarioItemSchema.extend({
