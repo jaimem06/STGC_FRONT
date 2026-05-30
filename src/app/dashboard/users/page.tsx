@@ -81,6 +81,7 @@ export default function UsersPage() {
   // Modal & Confirm States
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [showPasswordField, setShowPasswordField] = useState(false);
   const [editingUser, setEditingUser] = useState<UserOut | null>(null);
   const [statusConfirm, setStatusConfirm] = useState<{
     user: UserOut;
@@ -206,9 +207,7 @@ export default function UsersPage() {
     resetEdit({
       email: user.email,
       phone_number: user.phone_number || "",
-      identifier: user.identifier || "",
-      role_name: user.role.name,
-      status: user.status
+      role_name: user.role.name
     });
     setIsEditModalOpen(true);
   };
@@ -544,15 +543,14 @@ export default function UsersPage() {
       {/* Edit User Modal */}
       <Dialog
         isOpen={isEditModalOpen}
-        onOpenChange={setIsEditModalOpen}
+        onOpenChange={(open) => {
+          setIsEditModalOpen(open);
+          if (!open) setShowPasswordField(false);
+        }}
         title="Editar Empleado"
         description={`Actualizando datos de ${editingUser?.first_name || editingUser?.email}`}
       >
         <form onSubmit={handleSubmitEdit(handleUpdateUser)} className="space-y-4 pt-2">
-          <p className="text-[10px] text-primary/60 font-semibold italic px-1">
-            * Deja la contraseña en blanco para no cambiarla.
-          </p>
-          
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <Input 
@@ -564,13 +562,6 @@ export default function UsersPage() {
               />
             </div>
             
-            <Input 
-              label="Identificación" 
-              icon={Fingerprint} 
-              {...registerEdit("identifier")} 
-              error={errorsEdit.identifier?.message}
-            />
-
             <Input 
               label="Teléfono" 
               icon={Phone} 
@@ -586,28 +577,40 @@ export default function UsersPage() {
               error={errorsEdit.role_name?.message}
             />
 
-            <Select
-              label="Estado"
-              value={watchEdit("status") || ""}
-              options={[
-                { value: "ACTIVO", label: "Activo" },
-                { value: "INACTIVO", label: "Inactivo" },
-                { value: "SUSPENDIDO", label: "Suspendido" },
-                { value: "PENDIENTE", label: "Pendiente" },
-              ]}
-              onValueChange={(val) => setEditValue("status", val as any)}
-              error={errorsEdit.status?.message}
-            />
-
-            <div className="col-span-2">
-              <Input 
-                label="Nueva Contraseña" 
-                icon={Lock} 
-                type="password" 
-                placeholder="••••••••"
-                {...registerEdit("password")} 
-                error={errorsEdit.password?.message}
-              />
+            <div className="col-span-2 pt-2">
+              {!showPasswordField ? (
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordField(true)}
+                  className="flex items-center gap-2 text-[10px] font-bold text-secondary hover:text-primary transition-colors uppercase tracking-widest"
+                >
+                  <Lock size={14} /> Cambiar Contraseña
+                </button>
+              ) : (
+                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-primary uppercase tracking-widest">Nueva Contraseña</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPasswordField(false);
+                        setEditValue("password", "");
+                      }}
+                      className="text-[9px] font-bold text-error uppercase hover:underline"
+                    >
+                      Cancelar Cambio
+                    </button>
+                  </div>
+                  <Input 
+                    label="" 
+                    icon={Lock} 
+                    type="password" 
+                    placeholder="••••••••"
+                    {...registerEdit("password")} 
+                    error={errorsEdit.password?.message}
+                  />
+                </div>
+              )}
             </div>
           </div>
 

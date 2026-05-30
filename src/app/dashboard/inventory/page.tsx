@@ -130,7 +130,9 @@ export default function InventoryPage() {
     const cleanData = {
       ...data,
       descripcion: data.descripcion?.trim() === "" ? null : data.descripcion,
-      fecha_caducidad: data.fecha_caducidad ? new Date(data.fecha_caducidad).toISOString() : null,
+      fecha_caducidad: data.fecha_caducidad && data.fecha_caducidad.trim() !== "" 
+        ? new Date(data.fecha_caducidad).toISOString() 
+        : null,
     };
 
     try {
@@ -472,8 +474,9 @@ export default function InventoryPage() {
             />
             <Input 
               label="Fecha Caducidad" 
-              icon={Calendar}
               type="date"
+              icon={Calendar}
+              min={new Date().toISOString().split("T")[0]}
               {...registerCreate("fecha_caducidad")} 
               error={errorsCreate.fecha_caducidad?.message}
             />
