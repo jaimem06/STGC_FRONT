@@ -48,14 +48,14 @@ export const UserCreateSchema = z.object({
     .min(1, "La identificación es requerida"),
   phone_number: z.string()
     .min(1, "El teléfono es requerido")
-    .regex(phoneRegex, "Número de teléfono Inválido"),
+    .regex(phoneRegex, "Número Inválido"),
   status: z.enum(["ACTIVO", "INACTIVO", "SUSPENDIDO", "PENDIENTE"]).default("ACTIVO"),
 }).superRefine((data, ctx) => {
   if (data.id_type === "CEDULA") {
     if (!validateEcuadorianId(data.identifier)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Cédula Ecuatoriana Inválida",
+        message: "Cédula Inválida",
         path: ["identifier"],
       });
     }
