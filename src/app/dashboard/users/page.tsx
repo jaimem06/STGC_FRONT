@@ -119,7 +119,13 @@ export default function UsersPage() {
   const editRoleName = watchEdit("role_name");
 
   useEffect(() => {
-    setCreateValue("id_type", idType);
+    registerCreate("id_type");
+    registerCreate("role_name");
+    registerEdit("role_name");
+  }, [registerCreate, registerEdit]);
+
+  useEffect(() => {
+    setCreateValue("id_type", idType, { shouldValidate: true });
   }, [idType, setCreateValue]);
 
   const fetchData = useCallback(async () => {
@@ -527,7 +533,7 @@ export default function UsersPage() {
               required
               value={selectedRoleName || ""}
               options={roles.map(r => ({ value: r.name, label: r.name }))}
-              onValueChange={(val) => setCreateValue("role_name", val)}
+              onValueChange={(val) => setCreateValue("role_name", val, { shouldValidate: true })}
               error={errorsCreate.role_name?.message}
             />
           </div>
@@ -573,7 +579,7 @@ export default function UsersPage() {
               label="Cargo"
               value={editRoleName || ""}
               options={roles.map(r => ({ value: r.name, label: r.name }))}
-              onValueChange={(val) => setEditValue("role_name", val)}
+              onValueChange={(val) => setEditValue("role_name", val, { shouldValidate: true })}
               error={errorsEdit.role_name?.message}
             />
 
