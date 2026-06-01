@@ -10,13 +10,15 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import Input from "@/components/Input";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 
+import { canAccess, getDefaultRoute } from "@/lib/rbac";
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const setAuth = useAuthStore((state) => state.setAuth);
+  const { setAuth, fetchMe } = useAuthStore();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,16 +26,38 @@ export default function LoginPage() {
 
     try {
       const response = await api.post(ENDPOINTS.AUTH.LOGIN, { email, password });
-      const { access_token, user } = response.data;
+      console.log("LOGIN API RESPONSE:", response.data);
       
-      setAuth(user, access_token);
+      const { access_token, user: userFromResponse } = response.data;
+      
+      // Guardar token primero para que fetchMe pueda usarlo
+      setAuth(userFromResponse, access_token);
+      
+      let currentUser = userFromResponse;
+      
+      // Si la respuesta no trae el usuario, lo buscamos con /me
+      if (!currentUser) {
+        console.log("User missing from login response, fetching via /me...");
+        await fetchMe();
+        // Obtener el usuario actualizado del store
+        currentUser = useAuthStore.getState().user;
+      }
+
+      console.log("FINAL USER DATA:", JSON.stringify(currentUser, null, 2));
+      
       toast.success("¡Bienvenido de nuevo!");
       
-      // Pequeño retraso para asegurar que el estado se persista en móviles antes de navegar
+      const roleName = currentUser?.role?.name;
+      const destination = getDefaultRoute(roleName);
+      
+      console.log("REDIRECTION - Role Name:", roleName);
+      console.log("REDIRECTION - Target Destination:", destination);
+      
       setTimeout(() => {
-        router.push("/dashboard/users");
+        router.push(destination);
       }, 500);
     } catch (err: any) {
+      console.error("Login error:", err); // Added for debugging
       const status = err.response?.status;
       const detail = err.response?.data?.detail;
 
