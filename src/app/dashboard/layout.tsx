@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Sidebar from "./components/Sidebar";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/uiStore";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { canAccess, getDefaultRoute } from "@/lib/rbac";
 
 export default function DashboardLayout({
   children,
@@ -14,8 +15,9 @@ export default function DashboardLayout({
 }) {
   const { user, logout, fetchMe } = useAuthStore();
   const { isSidebarCollapsed } = useUIStore();
-  const [loading, setLoading] = useState(!user);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -26,7 +28,13 @@ export default function DashboardLayout({
       }
 
       try {
-        await fetchMe();
+        // Only fetch if we don't have a user yet
+        if (!user) {
+          await fetchMe();
+        }
+        
+        // After fetching user (or if we already had one), check permissions
+        // We use a small delay or wait for the store update if needed
         setLoading(false);
       } catch (error) {
         logout();
@@ -34,10 +42,33 @@ export default function DashboardLayout({
     };
 
     checkAuth();
-  }, [router, logout, fetchMe]);
+  }, [router, logout, fetchMe, user]);
+
+  // Handle route protection after loading user
+  useEffect(() => {
+    if (!loading && user) {
+      const roleName = user?.role?.name;
+      const hasAccess = canAccess(roleName, pathname);
+      
+      console.log(`LAYOUT DEBUG - Path: "${pathname}", Role: "${roleName}", HasAccess: ${hasAccess}`);
+      
+      if (!hasAccess) {
+        const destination = getDefaultRoute(roleName);
+        console.log(`LAYOUT DEBUG - ACCESS DENIED. Redirecting to: "${destination}"`);
+        router.push(destination);
+      }
+    }
+  }, [loading, user, pathname, router]);
 
   if (loading) {
     return <LoadingSpinner size={52} fullPage />;
+  }
+
+  // Double check access before rendering children to prevent flickering of restricted content
+  const currentRoleName = user?.role?.name;
+  if (user && !canAccess(currentRoleName, pathname)) {
+    console.log("LAYOUT DEBUG - Blocking render and showing redirect spinner");
+    return <LoadingSpinner size={52} fullPage message="Redirigiendo..." />;
   }
 
   return (

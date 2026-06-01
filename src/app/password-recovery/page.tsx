@@ -26,11 +26,18 @@ export default function PasswordRecoveryPage() {
     }
 
     setLoading(true);
+    console.log("RECOVERY DEBUG - Request data:", data);
     try {
-      await api.post(ENDPOINTS.AUTH.PASSWORD_RECOVERY, data);
+      const response = await api.post(ENDPOINTS.AUTH.PASSWORD_RECOVERY, data);
+      console.log("RECOVERY DEBUG - Server response:", response.data);
       setSent(true);
       toast.success("Si el correo existe, recibirás un enlace pronto.");
     } catch (err: any) {
+      console.error("RECOVERY DEBUG - Error:", {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message
+      });
       toast.error("Ocurrió un error. Intenta más tarde.");
     } finally {
       setLoading(false);

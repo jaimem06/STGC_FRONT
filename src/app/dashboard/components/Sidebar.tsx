@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/uiStore";
+import { canAccess } from "@/lib/rbac";
 
 const menuItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -40,6 +41,9 @@ export default function Sidebar() {
     isMobileSidebarOpen, 
     setMobileSidebarOpen 
   } = useUIStore();
+
+  // Filter menu items based on permissions
+  const filteredMenuItems = menuItems.filter(item => canAccess(user?.role?.name, item.href));
 
   return (
     <>
@@ -113,7 +117,7 @@ export default function Sidebar() {
 
         {/* Navigation Links */}
         <nav className="flex-grow overflow-y-auto px-2 space-y-0.5 custom-scrollbar">
-          {menuItems.map((item) => {
+          {filteredMenuItems.map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link
