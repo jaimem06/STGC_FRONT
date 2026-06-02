@@ -110,6 +110,7 @@ export default function UsersPage() {
     reset: resetEdit, 
     setValue: setEditValue, 
     watch: watchEdit,
+    clearErrors: clearErrorsEdit,
     formState: { errors: errorsEdit }
   } = useForm({
     resolver: zodResolver(UserUpdateSchema)
@@ -600,7 +601,8 @@ export default function UsersPage() {
                       type="button"
                       onClick={() => {
                         setShowPasswordField(false);
-                        setEditValue("password", "");
+                        setEditValue("password", undefined as any);
+                        clearErrorsEdit("password");
                       }}
                       className="text-[9px] font-bold text-error uppercase hover:underline"
                     >

@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const router = useRouter();
   const { setAuth, fetchMe } = useAuthStore();
 
@@ -26,7 +27,6 @@ export default function LoginPage() {
 
     try {
       const response = await api.post(ENDPOINTS.AUTH.LOGIN, { email, password });
-      console.log("LOGIN API RESPONSE:", response.data);
       
       const { access_token, user: userFromResponse } = response.data;
       
@@ -37,27 +37,21 @@ export default function LoginPage() {
       
       // Si la respuesta no trae el usuario, lo buscamos con /me
       if (!currentUser) {
-        console.log("User missing from login response, fetching via /me...");
         await fetchMe();
-        // Obtener el usuario actualizado del store
         currentUser = useAuthStore.getState().user;
       }
 
-      console.log("FINAL USER DATA:", JSON.stringify(currentUser, null, 2));
-      
+      // Iniciamos fase de redirección
+      setIsRedirecting(true);
       toast.success("¡Bienvenido de nuevo!");
       
       const roleName = currentUser?.role?.name;
       const destination = getDefaultRoute(roleName);
       
-      console.log("REDIRECTION - Role Name:", roleName);
-      console.log("REDIRECTION - Target Destination:", destination);
-      
-      setTimeout(() => {
-        router.push(destination);
-      }, 500);
+      // Redirigir inmediatamente. No quitamos el loader.
+      router.push(destination);
     } catch (err: any) {
-      console.error("Login error:", err); // Added for debugging
+      console.error("Login error:", err);
       const status = err.response?.status;
       const detail = err.response?.data?.detail;
 
@@ -77,16 +71,27 @@ export default function LoginPage() {
         default:
           toast.error(detail || "Error al iniciar sesión");
       }
-    } finally {
+      // Solo en caso de error volvemos a mostrar el formulario
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-surface selection:bg-secondary-container/30">
-      {loading && <LoadingSpinner fullPage message="Autenticando..." />}
+    <div className="min-h-screen bg-surface selection:bg-secondary-container/30 relative">
+      {/* 
+        LOGICA PROFESIONAL: El loader cubre toda la pantalla si se está autenticando o redirigiendo.
+        Esto evita que el usuario vea el formulario de nuevo mientras Next.js carga la nueva página.
+      */}
+      {(loading || isRedirecting) && (
+        <div className="fixed inset-0 z-[100] bg-surface flex items-center justify-center animate-in fade-in duration-300">
+          <LoadingSpinner 
+            size={52}
+            message={isRedirecting ? "Cargando tu panel de control..." : "Autenticando..."} 
+          />
+        </div>
+      )}
       
-      <div className="min-h-screen flex flex-col md:flex-row overflow-hidden">
+      <div className={`min-h-screen flex flex-col md:flex-row overflow-hidden transition-opacity duration-500 ${isRedirecting ? 'opacity-0' : 'opacity-100'}`}>
         {/* Left Column: Hero Editorial Imagery (Web) / Top Section (Mobile) */}
         <div className="relative w-full md:w-1/2 lg:w-3/5 h-[353px] md:h-screen overflow-hidden">
           <img
@@ -173,9 +178,9 @@ export default function LoginPage() {
               <button
                 className="w-full bg-gradient-to-br from-primary to-primary/80 text-on-primary py-3 rounded-xl font-headline font-bold text-base hover:shadow-xl hover:shadow-primary/30 active:scale-[0.97] hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden flex items-center justify-center gap-2"
                 type="submit"
-                disabled={loading}
+                disabled={loading || isRedirecting}
               >
-                Iniciar Sesión
+                {loading ? "Verificando..." : "Iniciar Sesión"}
               </button>
             </div>
 
