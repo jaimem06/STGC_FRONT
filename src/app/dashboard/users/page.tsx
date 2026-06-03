@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { api } from "@/lib/auth-service";
 import { ENDPOINTS } from "@/lib/endpoints";
 import { 
@@ -36,7 +37,7 @@ import Select from "@/components/Select";
 import Dialog from "@/components/Dialog";
 import Confirm from "@/components/Confirm";
 import Search from "@/components/Search";
-import { toast } from "sonner";
+import { toast } from "@/lib/notifications";
 
 interface RoleOut {
   id: string;
@@ -96,11 +97,12 @@ export default function UsersPage() {
     setValue: setCreateValue, 
     watch: watchCreate,
     formState: { errors: errorsCreate }
-  } = useForm({
+  } = useForm<z.input<typeof UserCreateSchema>, any, UserCreateInput>({
     resolver: zodResolver(UserCreateSchema),
     defaultValues: {
       status: "ACTIVO",
-      id_type: "CEDULA"
+      id_type: "CEDULA",
+      role_name: ""
     }
   });
 
@@ -112,7 +114,7 @@ export default function UsersPage() {
     watch: watchEdit,
     clearErrors: clearErrorsEdit,
     formState: { errors: errorsEdit }
-  } = useForm({
+  } = useForm<z.input<typeof UserUpdateSchema>, any, UserUpdateInput>({
     resolver: zodResolver(UserUpdateSchema)
   });
 
@@ -261,7 +263,7 @@ export default function UsersPage() {
       ),
     },
     {
-      header: "Cargo",
+      header: "Rol",
       accessor: (user: UserOut) => (
         <span className="text-xs font-bold text-primary">
           {user.role.name}
@@ -402,11 +404,11 @@ export default function UsersPage() {
             
             <div className="space-y-2 pt-1">
                <Select
-                label="Cargo"
+                label="Roles"
                 value={filterRole}
                 onValueChange={setFilterRole}
                 options={[
-                  { value: "ALL", label: "Todos los cargos" },
+                  { value: "ALL", label: "Todos los roles" },
                   ...roles.map(r => ({ value: r.name, label: r.name }))
                 ]}
               />
@@ -450,7 +452,11 @@ export default function UsersPage() {
         title="Nuevo Empleado"
         description="Registro de nuevo integrante del equipo."
       >
-        <form onSubmit={handleSubmitCreate((data) => handleCreateUser(data as unknown as UserCreateInput))} className="space-y-4 pt-2">
+        <form
+              noValidate
+              onSubmit={handleSubmitCreate(handleCreateUser)}
+              className="space-y-4 pt-2"
+        >
           {/* Selector de Tipo de Documento */}
           <div className="flex flex-col gap-2">
             <label className="text-[10px] font-black text-primary uppercase tracking-[0.15em] px-1">
@@ -530,9 +536,10 @@ export default function UsersPage() {
               error={errorsCreate.password?.message}
             />
             <Select
-              label="Cargo"
+              label="Rol"
               required
               value={selectedRoleName || ""}
+              placeholder="Selecciona un rol"
               options={roles.map(r => ({ value: r.name, label: r.name }))}
               onValueChange={(val) => setCreateValue("role_name", val, { shouldValidate: true })}
               error={errorsCreate.role_name?.message}
@@ -557,7 +564,7 @@ export default function UsersPage() {
         title="Editar Empleado"
         description={`Actualizando datos de ${editingUser?.first_name || editingUser?.email}`}
       >
-        <form onSubmit={handleSubmitEdit(handleUpdateUser)} className="space-y-4 pt-2">
+        <form noValidate onSubmit={handleSubmitEdit(handleUpdateUser)} className="space-y-4 pt-2">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <Input 
@@ -577,8 +584,9 @@ export default function UsersPage() {
             />
 
             <Select
-              label="Cargo"
+              label="Rol"
               value={editRoleName || ""}
+              placeholder="Selecciona un rol"
               options={roles.map(r => ({ value: r.name, label: r.name }))}
               onValueChange={(val) => setEditValue("role_name", val, { shouldValidate: true })}
               error={errorsEdit.role_name?.message}

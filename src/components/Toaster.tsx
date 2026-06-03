@@ -9,6 +9,7 @@ export default function Toaster() {
       position="top-center"
       toastOptions={{
         unstyled: true,
+        duration: Infinity,
         classNames: {
           toast: "group w-full max-w-[420px] flex items-center gap-4 p-5 rounded-[28px] shadow-[0_20px_50px_rgba(31,27,20,0.12)] border animate-in slide-in-from-top-4 duration-500 mt-4",
           title: "font-headline font-black text-[14px] leading-tight mb-0.5",
@@ -18,6 +19,7 @@ export default function Toaster() {
           warning: "bg-tertiary-container border-tertiary/20 text-tertiary",
           info: "bg-primary-container border-primary/20 text-on-primary",
           default: "bg-surface border-outline-variant/30 text-primary",
+          actionButton: "ml-auto bg-surface/20 hover:bg-surface/30 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 border border-current/10 shrink-0",
         },
       }}
       icons={{

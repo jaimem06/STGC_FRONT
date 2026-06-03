@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { api } from "@/lib/auth-service";
 import { ENDPOINTS } from "@/lib/endpoints";
 import { PasswordResetConfirmSchema, PasswordResetConfirmInput } from "@/lib/schemas";
-import { toast } from "sonner";
+import { toast } from "@/lib/notifications";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import Input from "@/components/Input";
 import { Lock, Save, AlertCircle, Eye, EyeOff } from "lucide-react";

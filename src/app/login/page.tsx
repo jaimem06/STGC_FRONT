@@ -5,24 +5,43 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/auth-service";
 import { ENDPOINTS } from "@/lib/endpoints";
 import { useAuthStore } from "@/store/authStore";
-import { toast } from "sonner";
+import { toast } from "@/lib/notifications";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import Input from "@/components/Input";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 
-import { canAccess, getDefaultRoute } from "@/lib/rbac";
+import { getDefaultRoute } from "@/lib/rbac";
+import { LoginSchema } from "@/lib/schemas";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const router = useRouter();
   const { setAuth, fetchMe } = useAuthStore();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    const validation = LoginSchema.safeParse({ email, password });
+    if (!validation.success) {
+      const nextErrors: { email?: string; password?: string } = {};
+
+      for (const issue of validation.error.issues) {
+        const field = issue.path[0];
+        if (field === "email" || field === "password") {
+          nextErrors[field] = issue.message;
+        }
+      }
+
+      setFieldErrors(nextErrors);
+      return;
+    }
+
+    setFieldErrors({});
     setLoading(true);
 
     try {
@@ -34,11 +53,15 @@ export default function LoginPage() {
       setAuth(userFromResponse, access_token);
       
       let currentUser = userFromResponse;
-      
-      // Si la respuesta no trae el usuario, lo buscamos con /me
-      if (!currentUser) {
-        await fetchMe();
-        currentUser = useAuthStore.getState().user;
+
+      // Si la respuesta no trae el usuario o el rol, lo buscamos con /me antes de redirigir
+      if (!currentUser?.role?.name) {
+        const fetchedUser = await fetchMe();
+        currentUser = fetchedUser ?? useAuthStore.getState().user;
+      }
+
+      if (!currentUser?.role?.name) {
+        throw new Error("No se pudo determinar el rol del usuario autenticado");
       }
 
       // Iniciamos fase de redirección
@@ -49,7 +72,7 @@ export default function LoginPage() {
       const destination = getDefaultRoute(roleName);
       
       // Redirigir inmediatamente. No quitamos el loader.
-      router.push(destination);
+      router.replace(destination);
     } catch (err: any) {
       console.error("Login error:", err);
       const status = err.response?.status;
@@ -129,16 +152,21 @@ export default function LoginPage() {
           </header>
 
           {/* Login Form */}
-          <form onSubmit={handleLogin} className="space-y-4 max-w-sm">
+          <form noValidate onSubmit={handleLogin} className="space-y-4 max-w-sm">
             <div className="space-y-4">
               <Input
                 label="Correo Electrónico"
                 icon={Mail}
                 type="email"
-                required
                 placeholder="ejemplo@terroir.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (fieldErrors.email) {
+                    setFieldErrors((current) => ({ ...current, email: undefined }));
+                  }
+                }}
+                error={fieldErrors.email}
               />
 
               <div className="relative">
@@ -146,10 +174,15 @@ export default function LoginPage() {
                   label="Contraseña"
                   icon={Lock}
                   type={showPassword ? "text" : "password"}
-                  required
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) {
+                      setFieldErrors((current) => ({ ...current, password: undefined }));
+                    }
+                  }}
+                  error={fieldErrors.password}
                   rightElement={
                     <button
                       type="button"

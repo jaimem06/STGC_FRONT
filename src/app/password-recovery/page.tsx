@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { api } from "@/lib/auth-service";
 import { PasswordResetRequestSchema, PasswordResetRequestInput } from "@/lib/schemas";
 import { ENDPOINTS } from "@/lib/endpoints";
-import { toast } from "sonner";
+import { toast } from "@/lib/notifications";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import Input from "@/components/Input";
 import { Mail, ArrowLeft, Send } from "lucide-react";
@@ -16,29 +17,32 @@ export default function PasswordRecoveryPage() {
   const [sent, setSent] = useState(false);
   const router = useRouter();
 
-  const { register, handleSubmit } = useForm<PasswordResetRequestInput>();
+  const { register, handleSubmit, formState: { errors } } = useForm<PasswordResetRequestInput>({
+    resolver: zodResolver(PasswordResetRequestSchema)
+  });
 
   const onSubmit = async (data: PasswordResetRequestInput) => {
-    const result = PasswordResetRequestSchema.safeParse(data);
-    if (!result.success) {
-      toast.error(result.error.issues[0].message);
-      return;
-    }
-
     setLoading(true);
-    console.log("RECOVERY DEBUG - Request data:", data);
+    console.log("RECOVERY DEBUG - Sending to:", `${ENDPOINTS.AUTH.BASE_URL}${ENDPOINTS.AUTH.PASSWORD_RECOVERY}`);
     try {
       const response = await api.post(ENDPOINTS.AUTH.PASSWORD_RECOVERY, data);
-      console.log("RECOVERY DEBUG - Server response:", response.data);
+      console.log("RECOVERY DEBUG - Success:", response.data);
       setSent(true);
       toast.success("Si el correo existe, recibirás un enlace pronto.");
     } catch (err: any) {
-      console.error("RECOVERY DEBUG - Error:", {
+      console.error("RECOVERY DEBUG - Error Detail:", {
         status: err.response?.status,
         data: err.response?.data,
         message: err.message
       });
-      toast.error("Ocurrió un error. Intenta más tarde.");
+      
+      const errorMessage = err.response?.data?.detail 
+        ? (typeof err.response.data.detail === 'string' 
+            ? err.response.data.detail 
+            : "Error de validación en el servidor")
+        : "No se pudo conectar con el servidor.";
+        
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -74,6 +78,7 @@ export default function PasswordRecoveryPage() {
               icon={Mail}
               type="email"
               placeholder="usuario@tierrafertil.com"
+              error={errors.email?.message}
               {...register("email")}
             />
 
