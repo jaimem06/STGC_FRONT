@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/auth-service";
 import { ENDPOINTS } from "@/lib/endpoints";
 import { useAuthStore } from "@/store/authStore";
-import { toast } from "sonner";
+import { toast } from "@/lib/notifications";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import Input from "@/components/Input";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";

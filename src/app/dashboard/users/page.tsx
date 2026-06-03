@@ -37,7 +37,7 @@ import Select from "@/components/Select";
 import Dialog from "@/components/Dialog";
 import Confirm from "@/components/Confirm";
 import Search from "@/components/Search";
-import { toast } from "sonner";
+import { toast } from "@/lib/notifications";
 
 interface RoleOut {
   id: string;

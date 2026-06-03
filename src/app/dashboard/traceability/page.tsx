@@ -28,7 +28,7 @@ import Table from "@/components/Table";
 import Select from "@/components/Select";
 import Dialog from "@/components/Dialog";
 import Search from "@/components/Search";
-import { toast } from "sonner";
+import { toast } from "@/lib/notifications";
 
 const faseStyles = {
   PULPA: "bg-red-50 text-red-700 border-red-200/50",

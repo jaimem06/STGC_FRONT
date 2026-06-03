@@ -1,4 +1,3 @@
-import { error } from "console";
 import { z } from "zod";
 
 const validateEcuadorianId = (id: string) => {
@@ -62,7 +61,7 @@ export const UserCreateSchema = z.object({
   phone_number: z.string()
     .min(1, "El teléfono es requerido")
     .regex(phoneRegex, "Número Inválido"),
-  status: z.enum(["ACTIVO", "INACTIVO", "SUSPENDIDO", "PENDIENTE"], {error: 'El rol seleccionado no es válido.' }).default("ACTIVO"),
+  status: z.enum(["ACTIVO", "INACTIVO", "SUSPENDIDO", "PENDIENTE"], {message: 'El rol seleccionado no es válido.' }).default("ACTIVO"),
 }).superRefine((data, ctx) => {
   if (data.id_type === "CEDULA") {
     if (!validateEcuadorianId(data.identifier)) {

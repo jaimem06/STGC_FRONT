@@ -35,7 +35,7 @@ import Input from "@/components/Input";
 import Select from "@/components/Select";
 import Dialog from "@/components/Dialog";
 import Search from "@/components/Search";
-import { toast } from "sonner";
+import { toast } from "@/lib/notifications";
 
 const statusStyles = {
   DISPONIBLE: "bg-green-50 text-green-700 border-green-200/50",

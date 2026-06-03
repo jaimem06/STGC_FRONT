@@ -20,7 +20,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import Input from "@/components/Input";
 import Confirm from "@/components/Confirm";
 import Dialog from "@/components/Dialog";
-import { toast } from "sonner";
+import { toast } from "@/lib/notifications";
 
 interface RoleOut {
   id: string;
