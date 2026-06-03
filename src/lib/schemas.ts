@@ -1,3 +1,4 @@
+import { error } from "console";
 import { z } from "zod";
 
 const validateEcuadorianId = (id: string) => {
@@ -29,13 +30,25 @@ const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
 const identifierRegex = /^[A-Z0-9]{6,15}$/i;
 
 export const LoginSchema = z.object({
-  email: z.string().email("Correo electrónico inválido"),
-  password: z.string().min(1, "La contraseña es requerida"),
+  email: z.string().email("Correo electrónico es requerido"),
+  password: z.string()
+   .min(8, 'Debe tener al menos 8 caracteres.')
+   .regex(/[A-Z]/, 'Debe incluir al menos una letra mayúscula.')
+   .regex(/[a-z]/, 'Debe incluir al menos una letra minúscula.')
+   .regex(/\d/, 'Debe incluir al menos un número.')
+   .regex(/[@$!%*?&]/, 'Debe incluir un carácter especial (@$!%*?&).')
+   .regex(/^[A-Za-z\d@$!%*?&]+$/, 'Contiene caracteres no permitidos.'),
 });
 
 export const UserCreateSchema = z.object({
-  email: z.string().email("Correo electrónico inválido"),
-  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  email: z.string().email("Correo electrónico es requerido"),
+  password: z.string()
+   .min(8, 'Debe tener al menos 8 caracteres.')
+  .regex(/[A-Z]/, 'Debe incluir al menos una letra mayúscula.')
+  .regex(/[a-z]/, 'Debe incluir al menos una letra minúscula.')
+  .regex(/\d/, 'Debe incluir al menos un número.')
+  .regex(/[@$!%*?&]/, 'Debe incluir un carácter especial (@$!%*?&).')
+  .regex(/^[A-Za-z\d@$!%*?&]+$/, 'Contiene caracteres no permitidos.'),
   role_name: z.string().min(1, "El rol es requerido"),
   first_name: z.string()
     .min(1, "El nombre es requerido")
@@ -49,7 +62,7 @@ export const UserCreateSchema = z.object({
   phone_number: z.string()
     .min(1, "El teléfono es requerido")
     .regex(phoneRegex, "Número Inválido"),
-  status: z.enum(["ACTIVO", "INACTIVO", "SUSPENDIDO", "PENDIENTE"]).default("ACTIVO"),
+  status: z.enum(["ACTIVO", "INACTIVO", "SUSPENDIDO", "PENDIENTE"], {error: 'El rol seleccionado no es válido.' }).default("ACTIVO"),
 }).superRefine((data, ctx) => {
   if (data.id_type === "CEDULA") {
     if (!validateEcuadorianId(data.identifier)) {
@@ -83,7 +96,13 @@ export const UserUpdateSchema = z.object({
     .regex(nameRegex, "El apellido solo puede contener letras")
     .nullable().optional(),
   phone_number: z.string().regex(phoneRegex, "Número de teléfono inválido").nullable().optional(),
-  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres").nullable().optional(),
+  password: z.string()
+  .min(8, 'Debe tener al menos 8 caracteres.')
+  .regex(/[A-Z]/, 'Debe incluir al menos una letra mayúscula.')
+  .regex(/[a-z]/, 'Debe incluir al menos una letra minúscula.')
+  .regex(/\d/, 'Debe incluir al menos un número.')
+  .regex(/[@$!%*?&]/, 'Debe incluir un carácter especial (@$!%*?&).')
+  .regex(/^[A-Za-z\d@$!%*?&]+$/, 'Contiene caracteres no permitidos.').nullable().optional(),
 });
 
 export const PasswordResetRequestSchema = z.object({
@@ -92,7 +111,13 @@ export const PasswordResetRequestSchema = z.object({
 
 export const PasswordResetConfirmSchema = z.object({
   token: z.string().min(1, "El token es requerido"),
-  new_password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  new_password: z.string()
+   .min(8, 'Debe tener al menos 8 caracteres.')
+   .regex(/[A-Z]/, 'Debe incluir al menos una letra mayúscula.')
+   .regex(/[a-z]/, 'Debe incluir al menos una letra minúscula.')
+   .regex(/\d/, 'Debe incluir al menos un número.')
+   .regex(/[@$!%*?&]/, 'Debe incluir un carácter especial (@$!%*?&).')
+   .regex(/^[A-Za-z\d@$!%*?&]+$/, 'Contiene caracteres no permitidos.'),
 });
 
 export const RoleCreateSchema = z.object({

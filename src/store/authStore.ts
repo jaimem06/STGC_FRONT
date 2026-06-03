@@ -25,7 +25,7 @@ interface AuthState {
   user: UserOut | null;
   token: string | null;
   setAuth: (user: UserOut, token: string) => void;
-  fetchMe: () => Promise<void>;
+  fetchMe: () => Promise<UserOut | null>;
   logout: () => void;
 }
 
@@ -35,28 +35,25 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       setAuth: (user, token) => {
-        if (typeof window !== "undefined") {
-          localStorage.setItem("token", token);
+        if (globalThis.window !== undefined) {
+          globalThis.localStorage.setItem("token", token);
         }
         set({ user, token });
       },
       fetchMe: async () => {
         const { token } = get();
-        if (!token) return;
+        if (!token) return null;
 
-        try {
-          const { api } = await import("@/lib/auth-service");
-          const response = await api.get(ENDPOINTS.AUTH.ME);
-          set({ user: response.data });
-        } catch (error) {
-          // Handle or ignore error silently for production
-        }
+        const { api } = await import("@/lib/auth-service");
+        const response = await api.get(ENDPOINTS.AUTH.ME);
+        set({ user: response.data });
+        return response.data;
       },
       logout: () => {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("token");
+        if (globalThis.window !== undefined) {
+          globalThis.localStorage.removeItem("token");
           // Use a more Next.js friendly way if possible, but window.location.href works for hard reset
-          window.location.href = "/login";
+          globalThis.window.location.href = "/login";
         }
         set({ user: null, token: null });
       },

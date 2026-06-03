@@ -1,3 +1,8 @@
+const normalizeBaseUrl = (value: string | undefined, fallback: string) => {
+  const baseUrl = value?.trim() || fallback;
+  return `${baseUrl.replace(/\/$/, "")}/`;
+};
+
 export const ENDPOINTS = {
   AUTH: {
     BASE_URL: process.env.NEXT_PUBLIC_AUTH_SERVICE_URL

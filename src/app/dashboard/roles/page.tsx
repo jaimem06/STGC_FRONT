@@ -117,14 +117,14 @@ export default function RolesPage() {
         <div className="lg:col-span-1 bg-secondary p-4 rounded-[24px] text-on-secondary flex flex-col justify-between shadow-xl shadow-secondary/30 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-16 h-16 bg-white/10 rounded-bl-full -mr-4 -mt-4"></div>
           <div className="relative z-10">
-            <h1 className="font-headline text-xl font-black tracking-tighter uppercase leading-none mb-1 text-white">Cargos</h1>
+            <h1 className="font-headline text-xl font-black tracking-tighter uppercase leading-none mb-1 text-white">Roles</h1>
             <p className="font-body text-[9px] opacity-70 uppercase tracking-widest font-bold text-white">Estructura Organizacional</p>
           </div>
           <button 
             onClick={handleOpenCreate}
             className="relative z-10 mt-3 h-9 bg-surface text-secondary rounded-lg font-headline font-bold text-[11px] flex items-center justify-center gap-2 hover:bg-white active:scale-95 transition-all shadow-sm"
           >
-            <Plus size={14} /> NUEVO CARGO
+            <Plus size={14} /> NUEVO ROL
           </button>
         </div>
 
@@ -135,7 +135,7 @@ export default function RolesPage() {
               <Briefcase size={20} />
             </div>
             <div>
-              <p className="text-[9px] font-bold text-outline uppercase tracking-widest leading-none mb-1">Cargos Definidos</p>
+              <p className="text-[9px] font-bold text-outline uppercase tracking-widest leading-none mb-1">Roles Definidos</p>
               <h4 className="font-headline text-xl font-black text-primary leading-none">{roles.length}</h4>
             </div>
           </div>
@@ -216,13 +216,13 @@ export default function RolesPage() {
       <Dialog
         isOpen={isModalOpen}
         onOpenChange={setIsModalOpen}
-        title={editingRole ? "Editar Cargo" : "Nuevo Cargo"}
+        title={editingRole ? "Editar rol" : "Nuevo rol"}
         description="Define el nombre y las responsabilidades."
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-2">
           <div className="space-y-3">
             <Input
-              label="Nombre del Cargo"
+              label="Nombre del Rol"
               required
               placeholder="EJ: SUPERVISOR"
               {...register("name")}
@@ -232,7 +232,7 @@ export default function RolesPage() {
               <label className="font-label text-[10px] font-bold text-outline uppercase tracking-widest ml-1">Descripción de Funciones</label>
               <textarea
                 className={`w-full min-h-[80px] bg-surface-container border ${errors.description ? 'border-error' : 'border-outline-variant/30'} rounded-xl p-3 font-body text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none`}
-                placeholder="Detalla las responsabilidades del cargo..."
+                placeholder="Detalla las responsabilidades del rol..."
                 {...register("description")}
               />
               {errors.description && (
@@ -263,7 +263,7 @@ export default function RolesPage() {
       <Confirm
         open={isDeleteConfirmOpen}
         onOpenChange={setIsDeleteConfirmOpen}
-        title="¿Eliminar este cargo?"
+        title="¿Eliminar este rol?"
         description="Esta acción es irreversible y podría afectar a los usuarios asociados."
         onConfirm={handleConfirmDelete}
         confirmText="ELIMINAR PERMANENTEMENTE"
