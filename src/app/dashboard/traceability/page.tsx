@@ -21,7 +21,7 @@ import {
 import { 
   LoteCafe, 
   FaseCafeEnum,
-  FaseCafe
+  type FaseCafe
 } from "@/lib/schemas";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import Table from "@/components/Table";

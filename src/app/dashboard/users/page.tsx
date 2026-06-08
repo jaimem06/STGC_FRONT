@@ -29,7 +29,7 @@ import {
   ShieldAlert
 } from "lucide-react";
 import { UserStatus } from "@/store/authStore";
-import { UserCreateSchema, UserCreateInput, UserUpdateSchema, UserUpdateInput } from "@/lib/schemas";
+import { UserCreateSchema, type UserCreateInput, UserUpdateSchema, type UserUpdateInput } from "@/lib/schemas";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import Table from "@/components/Table";
 import Input from "@/components/Input";

@@ -121,6 +121,9 @@ export const UserUpdateSchema = z.object({
   .regex(/^[A-Za-z\d@$!%*?&]+$/, 'Contiene caracteres no permitidos.').nullable().optional(),
 });
 
+export type UserCreateInput = z.infer<typeof UserCreateSchema>;
+export type UserUpdateInput = z.infer<typeof UserUpdateSchema>;
+
 // --- Inventory & Traceability Schemas ---
 
 export const CalidadCafeEnum = z.enum(["ALTA", "MEDIA", "BAJA"]);
@@ -135,6 +138,7 @@ export const EstadoInventarioEnum = z.enum([
   "CADUCADO",
 ]);
 export const FaseCafeEnum = z.enum(["PULPA", "DESPULPADO", "SECADO", "TOSTADO", "MOLIDO"]);
+export type FaseCafe = z.infer<typeof FaseCafeEnum>;
 export const TipoElementoEnum = z.enum(["INSUMO", "PRODUCTO", "CAFE_PROCESADO"]);
 export const TipoMovimientoEnum = z.enum(["ENTRADA", "SALIDA"]);
 export const UnidadMedidaEnum = z.enum(["QUINTALES", "ARROBAS", "LIBRAS", "UNIDADES", "LITROS", "KILOGRAMOS"]);

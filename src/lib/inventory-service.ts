@@ -5,7 +5,9 @@ import {
   UpdateInventarioItemInput,
   UpdateEstadoInput,
   InventarioItem, 
-  MovimientoStockInput
+  MovimientoStockInput,
+  LoteCafe,
+  FaseCafe
 } from "./schemas";
 
 export const inventoryInstance = createInstance(ENDPOINTS.INVENTORY.BASE_URL);
@@ -61,5 +63,16 @@ export const inventoryApi = {
       console.error("Error al exportar:", error);
       throw error;
     }
+  },
+
+  // Gestión de Lotes y Trazabilidad (Finca)
+  listLots: () => {
+    return inventoryInstance.get<LoteCafe[]>("finca/lotes");
+  },
+  transitionLotPhase: (id: string, nextPhase: FaseCafe) => {
+    return inventoryInstance.post<LoteCafe>(`finca/lotes/${id}/transicion`, { fase: nextPhase });
+  },
+  getTraceabilityHistory: (code: string) => {
+    return inventoryInstance.get<any>(`trazabilidad/${code}`);
   }
 };
