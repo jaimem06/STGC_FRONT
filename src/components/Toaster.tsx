@@ -9,7 +9,6 @@ export default function Toaster() {
       position="top-center"
       toastOptions={{
         unstyled: true,
-        duration: Infinity,
         classNames: {
           toast: "group w-full max-w-[420px] flex items-center gap-4 p-5 rounded-[28px] shadow-[0_20px_50px_rgba(31,27,20,0.12)] border animate-in slide-in-from-top-4 duration-500 mt-4",
           title: "font-headline font-black text-[14px] leading-tight mb-0.5",

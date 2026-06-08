@@ -37,9 +37,6 @@ export function normalizeRole(roleName: string | undefined): string {
     .replace(/\s+/g, "_")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
-  console.log(`RBAC DEBUG - normalizeRole("${roleName}") -> "${normalized}")`);
-  // Mensaje traducido
-  console.log(`RBAC DEPURACIÓN - normalizeRole("${roleName}") -> "${normalized}")`);
   return normalized;
 }
 
@@ -50,10 +47,12 @@ const FULL_ACCESS = [
   "/dashboard/users",
   "/dashboard/roles",
   "/dashboard/settings",
+  "/dashboard/pos",
 ];
 
 const OPERACIONES_ACCESS = [
   "/dashboard/users",
+  "/dashboard/pos",
 ];
 
 // Mapeo de permisos por rol exacto de la base de datos
@@ -62,63 +61,50 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   [ROLES.GERENTE_GENERAL]: FULL_ACCESS,
   [ROLES.GERENTE_OPERACIONES]: OPERACIONES_ACCESS,
   
-  // Por ahora, otros roles tienen acceso básico al dashboard si fuera necesario
+  // Habilitamos acceso a gestión de roles para el CAPATAZ
+  [ROLES.CAPATAZ]: ["/dashboard", "/dashboard/roles"],
+  
   [ROLES.GESTOR_INVENTARIO]: ["/dashboard", "/dashboard/inventory"],
   [ROLES.GESTOR_CALIDAD]: ["/dashboard", "/dashboard/traceability"],
+  [ROLES.CAJERO_MESERO]: ["/dashboard", "/dashboard/pos"],
 };
 
 /**
  * Verifica si un rol tiene permiso para acceder a una ruta específica.
  */
 export function canAccess(roleName: string | undefined, path: string): boolean {
-  if (!roleName) {
-    console.log(`RBAC DEPURACIÓN - canAccess: No se proporcionó rol para la ruta "${path}". Acceso denegado.`);
-    return false;
-  }
+  if (!roleName) return false;
   
   const normalizedRole = normalizeRole(roleName);
   
   // El administrador (ADMIN) siempre tiene acceso total
-  if (normalizedRole === ROLES.ADMIN) {
-    console.log(`RBAC DEPURACIÓN - canAccess: ADMIN detectado. Acceso concedido a "${path}".`);
-    return true;
-  }
+  if (normalizedRole === ROLES.ADMIN) return true;
 
   const allowedPaths = ROLE_PERMISSIONS[normalizedRole];
-  if (!allowedPaths) {
-    console.log(`RBAC DEPURACIÓN - canAccess: No se encontraron permisos para el rol "${normalizedRole}". Acceso denegado.`);
-    return false;
-  }
+  if (!allowedPaths) return false;
   
-  const hasAccess = allowedPaths.some(allowedPath => 
+  return allowedPaths.some(allowedPath => 
     path === allowedPath || path.startsWith(`${allowedPath}/`)
   );
-
-  console.log(`RBAC DEPURACIÓN - canAccess: El rol "${normalizedRole}" ${hasAccess ? "TIENE" : "NO TIENE"} acceso a "${path}".`);
-  return hasAccess;
 }
 
 /**
  * Retorna la página de destino predeterminada para un rol dado.
  */
 export function getDefaultRoute(roleName: string | undefined): string {
-  console.log(`RBAC DEPURACIÓN - getDefaultRoute llamado para el rol: "${roleName}"`);
   if (!roleName) return "/login";
   
   const normalizedRole = normalizeRole(roleName);
   
-  if (normalizedRole === ROLES.GERENTE_OPERACIONES) {
-    console.log("RBAC DEPURACIÓN - getDefaultRoute: Rol de operaciones detectado -> /dashboard/users");
-    return "/dashboard/users";
-  }
+  if (normalizedRole === ROLES.GERENTE_OPERACIONES) return "/dashboard/users";
   
-  if (normalizedRole === ROLES.ADMIN || normalizedRole === ROLES.GERENTE_GENERAL) {
-    console.log("RBAC DEPURACIÓN - getDefaultRoute: Rol de administración/gerencia detectado -> /dashboard");
-    return "/dashboard";
-  }
+  if (normalizedRole === ROLES.ADMIN || normalizedRole === ROLES.GERENTE_GENERAL) return "/dashboard";
+  
+  if (normalizedRole === ROLES.CAPATAZ) return "/dashboard/roles";
+  
+  if (normalizedRole === ROLES.CAJERO_MESERO) return "/dashboard/pos";
 
   // Fallback: primera ruta permitida o login
   const firstAllowed = ROLE_PERMISSIONS[normalizedRole]?.[0];
-  console.log(`RBAC DEPURACIÓN - getDefaultRoute fallback: "${firstAllowed || "/login"}"`);
   return firstAllowed || "/login";
 }
