@@ -23,6 +23,7 @@ import { canAccess } from "@/lib/rbac";
 
 const menuItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Punto de Venta", href: "/dashboard/pos", icon: Coffee },
   { name: "Inventario", href: "/dashboard/inventory", icon: Box },
   { name: "Trazabilidad", href: "/dashboard/traceability", icon: History },
   { name: "Usuarios", href: "/dashboard/users", icon: Users },

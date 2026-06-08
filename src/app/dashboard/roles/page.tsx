@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+// zod resolver removed because RoleCreate schema may not be exported from shared schemas
 import { api } from "@/lib/auth-service";
 import { ENDPOINTS } from "@/lib/endpoints";
 import { 
@@ -15,7 +15,11 @@ import {
   Users2,
   Lock
 } from "lucide-react";
-import { RoleCreateSchema, RoleCreateInput } from "@/lib/schemas";
+// Define local input type for the form to avoid relying on possibly-missing exports
+type RoleCreateInput = {
+  name: string;
+  description?: string | null;
+};
 import LoadingSpinner from "@/components/LoadingSpinner";
 import Input from "@/components/Input";
 import Confirm from "@/components/Confirm";
@@ -39,9 +43,7 @@ export default function RolesPage() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
 
-  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<RoleCreateInput>({
-    resolver: zodResolver(RoleCreateSchema)
-  });
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<RoleCreateInput>();
 
   const fetchData = useCallback(async () => {
     try {

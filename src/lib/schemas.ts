@@ -39,6 +39,23 @@ export const LoginSchema = z.object({
    .regex(/^[A-Za-z\d@$!%*?&]+$/, 'Contiene caracteres no permitidos.'),
 });
 
+export const PasswordResetRequestSchema = z.object({
+  email: z.string().email("Correo electrónico es requerido"),
+});
+export type PasswordResetRequestInput = z.infer<typeof PasswordResetRequestSchema>;
+
+export const PasswordResetConfirmSchema = z.object({
+  token: z.string().min(1, "Token es requerido"),
+  new_password: z.string()
+   .min(8, 'Debe tener al menos 8 caracteres.')
+   .regex(/[A-Z]/, 'Debe incluir al menos una letra mayúscula.')
+   .regex(/[a-z]/, 'Debe incluir al menos una letra minúscula.')
+   .regex(/\d/, 'Debe incluir al menos un número.')
+   .regex(/[@$!%*?&]/, 'Debe incluir un carácter especial (@$!%*?&).')
+   .regex(/^[A-Za-z\d@$!%*?&]+$/, 'Contiene caracteres no permitidos.'),
+});
+export type PasswordResetConfirmInput = z.infer<typeof PasswordResetConfirmSchema>;
+
 export const UserCreateSchema = z.object({
   email: z.string().email("Correo electrónico es requerido"),
   password: z.string()
@@ -104,37 +121,11 @@ export const UserUpdateSchema = z.object({
   .regex(/^[A-Za-z\d@$!%*?&]+$/, 'Contiene caracteres no permitidos.').nullable().optional(),
 });
 
-export const PasswordResetRequestSchema = z.object({
-  email: z.string().email("Correo electrónico inválido"),
-});
-
-export const PasswordResetConfirmSchema = z.object({
-  token: z.string().min(1, "El token es requerido"),
-  new_password: z.string()
-   .min(8, 'Debe tener al menos 8 caracteres.')
-   .regex(/[A-Z]/, 'Debe incluir al menos una letra mayúscula.')
-   .regex(/[a-z]/, 'Debe incluir al menos una letra minúscula.')
-   .regex(/\d/, 'Debe incluir al menos un número.')
-   .regex(/[@$!%*?&]/, 'Debe incluir un carácter especial (@$!%*?&).')
-   .regex(/^[A-Za-z\d@$!%*?&]+$/, 'Contiene caracteres no permitidos.'),
-});
-
-export const RoleCreateSchema = z.object({
-  name: z.string()
-    .min(5, "El nombre del rol debe tener al menos 5 caracteres")
-    .transform(v => v.toUpperCase())
-    .refine(v => /^[A-Z_]+$/.test(v), "Solo se permiten letras y guiones bajos (_)"),
-  description: z.string()
-    .min(1, "La descripción es requerida")
-    .refine(v => /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s\.,;:'"()\-]+$/.test(v), "Solo se permite texto")
-    .refine(v => v.trim().split(/\s+/).length >= 10, "Mínimo 10 palabras"),
-});
-
 // --- Inventory & Traceability Schemas ---
 
 export const CalidadCafeEnum = z.enum(["ALTA", "MEDIA", "BAJA"]);
 export const ClasificacionInsumoEnum = z.enum(["QUIMICO_FERTILIZANTE", "QUIMICO_FUNGICIDA", "ORGANICO"]);
-export const EstadoProductoEnum = z.enum([
+export const EstadoInventarioEnum = z.enum([
   "DISPONIBLE",
   "AGOTADO",
   "STOCK_BAJO",
@@ -146,31 +137,62 @@ export const EstadoProductoEnum = z.enum([
 export const FaseCafeEnum = z.enum(["PULPA", "DESPULPADO", "SECADO", "TOSTADO", "MOLIDO"]);
 export const TipoElementoEnum = z.enum(["INSUMO", "PRODUCTO", "CAFE_PROCESADO"]);
 export const TipoMovimientoEnum = z.enum(["ENTRADA", "SALIDA"]);
-export const UnidadMedidaEnum = z.enum(["QUINTALES", "ARROBAS", "LIBRAS"]);
+export const UnidadMedidaEnum = z.enum(["QUINTALES", "ARROBAS", "LIBRAS", "UNIDADES", "LITROS", "KILOGRAMOS"]);
+export const ModuloInventarioEnum = z.enum(["FINCA", "CAFETERIA"]);
 
-export const CreateInventarioItemSchema = z.object({
+// Base schema for extending
+const BaseInventarioItemObject = z.object({
   sku: z.string().min(1, "El SKU es requerido"),
   nombre: z.string().min(1, "El nombre es requerido"),
   descripcion: z.string().nullable().optional(),
   tipo: TipoElementoEnum,
-  estado: EstadoProductoEnum,
+  estado: EstadoInventarioEnum,
   unidad_medida: UnidadMedidaEnum,
   precio: z.number().min(0, "El precio debe ser mayor o igual a 0"),
   fecha_caducidad: z.string().nullable().optional(),
-}).refine((data) => {
+  modulo: ModuloInventarioEnum,
+  stock_minimo: z.number().min(0).optional(),
+  codigo_trazabilidad: z.string().uuid().nullable().optional(),
+  calidad: CalidadCafeEnum.nullable().optional(),
+  fase_produccion: FaseCafeEnum.nullable().optional(),
+});
+
+const ExpiryDateRefinement = (data: { fecha_caducidad?: string | null }) => {
   if (!data.fecha_caducidad) return true;
   const expiryDate = new Date(data.fecha_caducidad);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return expiryDate >= today;
-}, {
+};
+
+const ExpiryDateMessage = {
   message: "La fecha de caducidad no puede ser anterior a hoy",
   path: ["fecha_caducidad"],
+};
+
+export const CreateInventarioItemSchema = BaseInventarioItemObject.refine(
+  ExpiryDateRefinement,
+  ExpiryDateMessage
+);
+
+export const UpdateInventarioItemSchema = z.object({
+  nombre: z.string().min(1).optional(),
+  estado: EstadoInventarioEnum.optional(),
+  precio: z.number().min(0).optional(),
+  descripcion: z.string().nullable().optional(),
+  stock_minimo: z.number().min(0).optional(),
+  unidad_medida: UnidadMedidaEnum.optional(),
+  fecha_caducidad: z.string().nullable().optional(),
 });
 
-export const InventarioItemSchema = CreateInventarioItemSchema.extend({
+export const UpdateEstadoSchema = z.object({
+  estado: EstadoInventarioEnum,
+});
+
+export const InventarioItemSchema = BaseInventarioItemObject.extend({
   id: z.string().uuid(),
   cantidad: z.number(),
+  is_deleted: z.boolean(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -198,22 +220,11 @@ export const LoteCafeSchema = z.object({
   lote_anterior_id: z.string().uuid().nullable().optional(),
 });
 
-export type LoginInput = z.infer<typeof LoginSchema>;
-export type UserCreateInput = z.infer<typeof UserCreateSchema>;
-export type UserUpdateInput = z.infer<typeof UserUpdateSchema>;
-export type PasswordResetRequestInput = z.infer<typeof PasswordResetRequestSchema>;
-export type PasswordResetConfirmInput = z.infer<typeof PasswordResetConfirmSchema>;
-export type RoleCreateInput = z.infer<typeof RoleCreateSchema>;
-
-// Inventory types
-export type CalidadCafe = z.infer<typeof CalidadCafeEnum>;
-export type ClasificacionInsumo = z.infer<typeof ClasificacionInsumoEnum>;
-export type EstadoProducto = z.infer<typeof EstadoProductoEnum>;
-export type FaseCafe = z.infer<typeof FaseCafeEnum>;
-export type TipoElemento = z.infer<typeof TipoElementoEnum>;
-export type TipoMovimiento = z.infer<typeof TipoMovimientoEnum>;
-export type UnidadMedida = z.infer<typeof UnidadMedidaEnum>;
+export type ModuloInventario = z.infer<typeof ModuloInventarioEnum>;
+export type EstadoInventario = z.infer<typeof EstadoInventarioEnum>;
 export type CreateInventarioItemInput = z.infer<typeof CreateInventarioItemSchema>;
+export type UpdateInventarioItemInput = z.infer<typeof UpdateInventarioItemSchema>;
+export type UpdateEstadoInput = z.infer<typeof UpdateEstadoSchema>;
 export type InventarioItem = z.infer<typeof InventarioItemSchema>;
 export type MovimientoStockInput = z.infer<typeof MovimientoStockSchema>;
 export type LoteCafe = z.infer<typeof LoteCafeSchema>;

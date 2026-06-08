@@ -2,21 +2,19 @@ import { toast as sonnerToast } from "sonner";
 
 /**
  * Profesional notification utility for STGC.
- * All notifications are persistent (duration: Infinity) and require user confirmation.
+ * By default, notifications require user confirmation, except for success.
  */
 export const toast = {
-  success: (message: string, description?: string, actionLabel: string = "Entendido") =>
+  success: (message: string, description?: string) =>
     sonnerToast.success(message, {
       description,
-      action: {
-        label: actionLabel,
-        onClick: () => {},
-      },
+      duration: 3000,
     }),
 
   error: (message: string, description?: string, actionLabel: string = "Cerrar") =>
     sonnerToast.error(message, {
       description,
+      duration: Infinity,
       action: {
         label: actionLabel,
         onClick: () => {},
@@ -26,6 +24,7 @@ export const toast = {
   warning: (message: string, description?: string, actionLabel: string = "Revisar") =>
     sonnerToast.warning(message, {
       description,
+      duration: Infinity,
       action: {
         label: actionLabel,
         onClick: () => {},
@@ -35,6 +34,7 @@ export const toast = {
   info: (message: string, description?: string, actionLabel: string = "Ok") =>
     sonnerToast.info(message, {
       description,
+      duration: Infinity,
       action: {
         label: actionLabel,
         onClick: () => {},
