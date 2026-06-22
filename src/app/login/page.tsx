@@ -80,7 +80,7 @@ export default function LoginPage() {
 
       switch (status) {
         case 401:
-          toast.error("Credenciales inválidas. Verifica tu correo y contraseña.");
+          toast.error("Usuario inactivo o suspendido. Contacta al administrador.");
           break;
         case 403:
           toast.error("Usuario inactivo o suspendido. Contacta al administrador.");

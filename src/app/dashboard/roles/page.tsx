@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
 // zod resolver removed because RoleCreate schema may not be exported from shared schemas
 import { api } from "@/lib/auth-service";
@@ -13,7 +13,8 @@ import {
   FileText,
   Briefcase,
   Users2,
-  Lock
+  Lock,
+  Search as SearchIcon
 } from "lucide-react";
 // Define local input type for the form to avoid relying on possibly-missing exports
 type RoleCreateInput = {
@@ -24,6 +25,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import Input from "@/components/Input";
 import Confirm from "@/components/Confirm";
 import Dialog from "@/components/Dialog";
+import Search from "@/components/Search";
 import { toast } from "@/lib/notifications";
 
 interface RoleOut {
@@ -38,6 +40,7 @@ export default function RolesPage() {
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<RoleOut | null>(null);
+  const [search, setSearch] = useState("");
 
   // Deletion State
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -108,6 +111,22 @@ export default function RolesPage() {
     }
   };
 
+  const groupedRoles = useMemo(() => {
+    const filtered = roles.filter(role => 
+      role.name.toLowerCase().includes(search.toLowerCase()) || 
+      (role.description && role.description.toLowerCase().includes(search.toLowerCase()))
+    ).sort((a, b) => a.name.localeCompare(b.name));
+
+    return filtered.reduce((acc, role) => {
+      const firstLetter = role.name.charAt(0).toUpperCase();
+      if (!acc[firstLetter]) {
+        acc[firstLetter] = [];
+      }
+      acc[firstLetter].push(role);
+      return acc;
+    }, {} as Record<string, RoleOut[]>);
+  }, [roles, search]);
+
   if (loading) return <LoadingSpinner size={52} fullPage />;
 
   return (
@@ -162,56 +181,87 @@ export default function RolesPage() {
         </div>
       </div>
 
-      {/* Roles Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-        {roles.map((role) => (
-          <div key={role.id} className="group bg-white rounded-[24px] p-5 border border-outline-variant/30 shadow-sm hover:shadow-xl hover:border-secondary/20 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[180px]">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-bl-[60px] -mr-12 -mt-12 group-hover:scale-110 transition-transform duration-500"></div>
-            
-            <div className="relative z-10">
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-10 h-10 bg-surface-container-high rounded-xl flex items-center justify-center text-primary shadow-inner">
-                  <ShieldCheck size={20} />
-                </div>
-                <div className="flex gap-1">
-                  <button 
-                    onClick={() => handleOpenEdit(role)}
-                    className="p-1.5 text-outline hover:text-secondary hover:bg-secondary/10 rounded-lg transition-all"
-                    title="Editar"
-                  >
-                    <Edit3 size={16} />
-                  </button>
-                  <button 
-                    onClick={() => { setRoleToDelete(role.id); setIsDeleteConfirmOpen(true); }}
-                    className="p-1.5 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
-                    title="Eliminar"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-              
-              <h3 className="font-headline text-lg font-black text-primary mb-2 tracking-tighter uppercase leading-tight line-clamp-1 group-hover:text-secondary transition-colors">
-                {role.name}
-              </h3>
-              
-              <div className="flex items-start gap-1.5">
-                <FileText size={12} className="text-outline shrink-0 mt-0.5" />
-                <p className="font-body text-[11px] text-on-surface-variant font-medium leading-normal italic opacity-80 line-clamp-3">
-                  {role.description || "Sin descripción detallada."}
-                </p>
-              </div>
-            </div>
-
-            <div className="relative z-10 pt-3 mt-3 border-t border-outline-variant/10 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-secondary"></div>
-                <span className="text-[9px] font-black text-secondary uppercase tracking-[0.15em]">Activo</span>
-              </div>
-              <ShieldCheck size={14} className="text-secondary/20" />
-            </div>
+      {/* Toolbar / Search */}
+      <div className="bg-white p-3 rounded-[20px] shadow-sm flex flex-col md:flex-row gap-3 items-center border border-outline-variant/30">
+        <div className="flex-1 w-full relative">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-outline">
+            <SearchIcon size={18} />
           </div>
-        ))}
+          <input
+            type="text"
+            className="w-full bg-surface-container-lowest border border-outline-variant/50 rounded-xl pl-11 pr-4 py-2.5 font-body text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-outline/70"
+            placeholder="Buscar por nombre o descripción..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Roles Grid Grouped Alphabetically */}
+      <div className="space-y-6">
+        {Object.keys(groupedRoles).length === 0 ? (
+          <div className="text-center py-12">
+            <p className="font-headline text-outline text-lg font-bold">No se encontraron roles</p>
+            <p className="font-body text-sm text-outline-variant mt-1">Intenta con otro término de búsqueda.</p>
+          </div>
+        ) : (
+          Object.keys(groupedRoles).sort().map(letter => (
+            <div key={letter} className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center font-headline font-black text-primary border border-outline-variant/30">
+                  {letter}
+                </div>
+                <div className="h-px bg-outline-variant/20 flex-1"></div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {groupedRoles[letter].map((role) => (
+                  <div key={role.id} className="group bg-white rounded-[24px] p-5 border border-outline-variant/30 shadow-sm hover:shadow-xl hover:border-secondary/20 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[180px]">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-bl-[60px] -mr-12 -mt-12 group-hover:scale-110 transition-transform duration-500"></div>
+                    
+                    <div className="relative z-10">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="w-10 h-10 bg-surface-container-high rounded-xl flex items-center justify-center text-primary shadow-inner">
+                          <ShieldCheck size={20} />
+                        </div>
+                        <div className="flex gap-1">
+                          <button 
+                            onClick={() => handleOpenEdit(role)}
+                            className="p-1.5 text-outline hover:text-secondary hover:bg-secondary/10 rounded-lg transition-all"
+                            title="Editar"
+                          >
+                            <Edit3 size={16} />
+                          </button>
+                          <button 
+                            onClick={() => { setRoleToDelete(role.id); setIsDeleteConfirmOpen(true); }}
+                            className="p-1.5 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
+                            title="Eliminar"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <h3 className="font-headline text-lg font-black text-primary mb-2 tracking-tighter uppercase leading-tight line-clamp-1 group-hover:text-secondary transition-colors">
+                        {role.name}
+                      </h3>
+                      
+                      <div className="flex items-start gap-1.5">
+                        <FileText size={12} className="text-outline shrink-0 mt-0.5" />
+                        <p className="font-body text-[11px] text-on-surface-variant font-medium leading-normal italic opacity-80 line-clamp-3">
+                          {role.description || "Sin descripción detallada."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="relative z-10 pt-3 mt-3 border-t border-outline-variant/10 flex items-center justify-end">
+                      <ShieldCheck size={14} className="text-secondary/20" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Create/Edit Modal */}
