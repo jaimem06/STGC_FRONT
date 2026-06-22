@@ -127,12 +127,11 @@ export default function InventoryPage() {
     const cleanData = {
       ...data,
       fecha_caducidad: data.fecha_caducidad === "" ? null : data.fecha_caducidad,
-      descripcion: data.descripcion === "" ? null : data.descripcion,
     };
     setIsActionLoading(true);
     try {
       await inventoryApi.createItem(cleanData);
-      toast.success("Producto registrado exitosamente.");
+      toast.success("Producto/insumo registrado exitosamente");
       setIsCreateModalOpen(false);
       resetCreate();
       fetchData();
