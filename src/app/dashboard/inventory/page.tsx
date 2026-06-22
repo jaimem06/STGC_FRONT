@@ -42,6 +42,38 @@ const typeIcons = {
   CAFE_PROCESADO: Layers,
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ProductFormFields = ({ register, errors, watch, setValue, isEdit = false }: any) => (
+  <div className="grid grid-cols-2 gap-4">
+    <div className="col-span-2">
+      <Input label="Nombre" required {...register("nombre")} error={errors.nombre?.message} />
+    </div>
+    {!isEdit && (
+      <Input label="SKU" required {...register("sku")} error={errors.sku?.message} />
+    )}
+    <Input label="Precio" type="number" step="0.01" required {...register("precio", { valueAsNumber: true })} error={errors.precio?.message} />
+    <Input label="Mínimo" type="number" step="1" required {...register("stock_minimo", { valueAsNumber: true })} error={errors.stock_minimo?.message} />
+    {!isEdit && (
+      <Select label="Categoría" required value={watch("tipo") || ""} options={TipoElementoEnum.options.map(t => ({ value: t, label: t.replace("_", " ") }))} onValueChange={(val) => setValue("tipo", val)} error={errors.tipo?.message} />
+    )}
+    <Select label="Unidad" required value={watch("unidad_medida") || ""} options={UnidadMedidaEnum.options.map(u => ({ value: u, label: u }))} onValueChange={(val) => setValue("unidad_medida", val)} error={errors.unidad_medida?.message} />
+    <Select label="Estado" required value={watch("estado") || (isEdit ? "" : "DISPONIBLE")} options={EstadoInventarioEnum.options.map(e => ({ value: e, label: e.replace("_", " ") }))} onValueChange={(val) => setValue("estado", val)} error={errors.estado?.message} />
+    <div className="col-span-2">
+      <Input label="Fecha Caducidad" type="date" {...register("fecha_caducidad")} error={errors.fecha_caducidad?.message} />
+    </div>
+    <div className="col-span-2">
+      <label className="block font-label text-[9px] font-bold uppercase tracking-widest text-outline ml-1 mb-1">Descripción <span className="text-error">*</span></label>
+      <div className="relative">
+        <textarea className={`w-full bg-white border rounded-xl outline-none transition-all font-label text-sm font-bold shadow-sm placeholder:font-medium placeholder:text-outline/50 focus:ring-2 p-3 resize-none ${errors.descripcion ? "border-error focus:border-error focus:ring-error/10" : "border-outline-variant/20 focus:border-primary/30 focus:ring-primary/10"}`} rows={3} placeholder="Descripción del producto..." {...register("descripcion")} />
+        <div className="flex justify-between items-center mt-1">
+          {errors.descripcion ? <p className="text-[9px] font-bold text-error ml-1">{errors.descripcion.message}</p> : <span />}
+          <span className="text-[9px] font-bold text-outline mr-1">{(watch("descripcion") || "").length}/250</span>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 export default function InventoryPage() {
   const [items, setItems] = useState<InventarioItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -328,9 +360,19 @@ export default function InventoryPage() {
       </div>
 
       {/* Modales actualizados */}
-      <Dialog isOpen={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} title="Crear Producto"><form onSubmit={handleSubmitCreate(handleCreateItem)} className="space-y-4 pt-2"><div className="grid grid-cols-2 gap-4"><div className="col-span-2"><Input label="Nombre" required {...registerCreate("nombre")} error={errorsCreate.nombre?.message} /></div><Input label="SKU" required {...registerCreate("sku")} error={errorsCreate.sku?.message} /><Input label="Precio" type="number" step="0.01" required {...registerCreate("precio", { valueAsNumber: true })} error={errorsCreate.precio?.message} /><Input label="Mínimo" type="number" step="1" required {...registerCreate("stock_minimo", { valueAsNumber: true })} error={errorsCreate.stock_minimo?.message} /><Select label="Categoría" required value={selectedType} options={TipoElementoEnum.options.map(t => ({ value: t, label: t.replace("_", " ") }))} onValueChange={(val) => setCreateValue("tipo", val as any)} error={errorsCreate.tipo?.message} /><Select label="Unidad" required value={selectedUnit} options={UnidadMedidaEnum.options.map(u => ({ value: u, label: u }))} onValueChange={(val) => setCreateValue("unidad_medida", val as any)} error={errorsCreate.unidad_medida?.message} /><Select label="Estado" required value={watchCreate("estado") || "DISPONIBLE"} options={EstadoInventarioEnum.options.map(e => ({ value: e, label: e.replace("_", " ") }))} onValueChange={(val) => setCreateValue("estado", val as any)} error={errorsCreate.estado?.message} /><div className="col-span-2"><Input label="Fecha Caducidad" type="date" {...registerCreate("fecha_caducidad")} error={errorsCreate.fecha_caducidad?.message} /></div><div className="col-span-2"><label className="block font-label text-[9px] font-bold uppercase tracking-widest text-outline ml-1 mb-1">Descripción <span className="text-error">*</span></label><div className="relative"><textarea className={`w-full bg-white border rounded-xl outline-none transition-all font-label text-sm font-bold shadow-sm placeholder:font-medium placeholder:text-outline/50 focus:ring-2 p-3 resize-none ${errorsCreate.descripcion ? "border-error focus:border-error focus:ring-error/10" : "border-outline-variant/20 focus:border-primary/30 focus:ring-primary/10"}`} rows={3} placeholder="Descripción del producto..." {...registerCreate("descripcion")} /><div className="flex justify-between items-center mt-1">{errorsCreate.descripcion ? <p className="text-[9px] font-bold text-error ml-1">{errorsCreate.descripcion.message}</p> : <span />}<span className="text-[9px] font-bold text-outline mr-1">{(watchCreate("descripcion") || "").length}/250</span></div></div></div></div><button type="submit" className="w-full h-12 bg-primary text-white rounded-xl font-bold uppercase tracking-widest shadow-lg">GUARDAR</button></form></Dialog>
+      <Dialog isOpen={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} title="Crear Producto">
+        <form onSubmit={handleSubmitCreate(handleCreateItem)} className="space-y-4 pt-2">
+          <ProductFormFields register={registerCreate} errors={errorsCreate} watch={watchCreate} setValue={setCreateValue} />
+          <button type="submit" className="w-full h-12 bg-primary text-white rounded-xl font-bold uppercase tracking-widest shadow-lg">GUARDAR</button>
+        </form>
+      </Dialog>
 
-      <Dialog isOpen={isEditModalOpen} onOpenChange={setIsEditModalOpen} title="Editar Producto"><form onSubmit={handleSubmitEdit(handleEditItem)} className="space-y-4 pt-2"><div className="grid grid-cols-2 gap-4"><div className="col-span-2"><Input label="Nombre" {...registerEdit("nombre")} /></div><Input label="Precio" type="number" step="0.01" {...registerEdit("precio", { valueAsNumber: true })} /><Input label="Mínimo" type="number" step="0.01" {...registerEdit("stock_minimo", { valueAsNumber: true })} /><Select label="Unidad" value={watchEdit("unidad_medida") || ""} options={UnidadMedidaEnum.options.map(u => ({ value: u, label: u }))} onValueChange={(val) => setEditValue("unidad_medida", val as any)} /><Select label="Estado" value={watchEdit("estado") || ""} options={EstadoInventarioEnum.options.map(e => ({ value: e, label: e.replace("_", " ") }))} onValueChange={(val) => setEditValue("estado", val as any)} /><div className="col-span-2"><Input label="Fecha Caducidad" type="date" {...registerEdit("fecha_caducidad")} /></div><div className="col-span-2"><Input label="Descripción" {...registerEdit("descripcion")} /></div></div><button type="submit" className="w-full h-12 bg-tertiary text-white rounded-xl font-bold uppercase shadow-lg">ACTUALIZAR</button></form></Dialog>
+      <Dialog isOpen={isEditModalOpen} onOpenChange={setIsEditModalOpen} title="Editar Producto">
+        <form onSubmit={handleSubmitEdit(handleEditItem)} className="space-y-4 pt-2">
+          <ProductFormFields register={registerEdit} errors={errorsEdit} watch={watchEdit} setValue={setEditValue} isEdit />
+          <button type="submit" className="w-full h-12 bg-tertiary text-white rounded-xl font-bold uppercase shadow-lg">ACTUALIZAR</button>
+        </form>
+      </Dialog>
 
       <Dialog isOpen={isStatusModalOpen} onOpenChange={setIsStatusModalOpen} title="Actualizar Disponibilidad"><form onSubmit={handleSubmitStatus(handleUpdateStatus)} className="space-y-6 pt-2"><Select label="Nuevo Estado" required value={watchStatus("estado") || ""} options={EstadoInventarioEnum.options.map(s => ({ value: s, label: s.replace("_", " ") }))} onValueChange={(val) => setStatusValue("estado", val as EstadoInventario)} /><button type="submit" className="w-full h-12 bg-primary text-white rounded-xl font-bold uppercase shadow-lg">GUARDAR</button></form></Dialog>
 

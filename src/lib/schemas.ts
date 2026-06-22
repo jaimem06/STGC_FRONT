@@ -211,15 +211,15 @@ export const CreateInventarioItemSchema = BaseInventarioItemObject.refine(
   ExpiryDateMessage
 );
 
-export const UpdateInventarioItemSchema = z.object({
-  nombre: z.string().min(1).optional(),
-  estado: EstadoInventarioEnum.optional(),
-  precio: z.number().min(0).optional(),
-  descripcion: z.string().nullable().optional(),
-  stock_minimo: z.number().min(0).optional(),
-  unidad_medida: UnidadMedidaEnum.optional(),
-  fecha_caducidad: z.string().nullable().optional(),
-});
+export const UpdateInventarioItemSchema = BaseInventarioItemObject.pick({
+  nombre: true,
+  estado: true,
+  precio: true,
+  descripcion: true,
+  stock_minimo: true,
+  unidad_medida: true,
+  fecha_caducidad: true,
+}).refine(ExpiryDateRefinement, ExpiryDateMessage);
 
 export const UpdateEstadoSchema = z.object({
   estado: EstadoInventarioEnum,
