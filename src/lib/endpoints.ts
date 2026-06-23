@@ -4,6 +4,12 @@ const normalizeBaseUrl = (value: string | undefined, fallback: string) => {
 };
 
 export const ENDPOINTS = {
+  BILLING: {
+    BASE_URL: normalizeBaseUrl(
+      process.env.NEXT_PUBLIC_BILLING_SERVICE_URL,
+      "http://localhost:3002/api/"
+    ),
+  },
   AUTH: {
     BASE_URL: normalizeBaseUrl(
       process.env.NEXT_PUBLIC_AUTH_SERVICE_URL,
