@@ -191,6 +191,18 @@ const BaseInventarioItemObject = z.object({
   codigo_trazabilidad: z.string().uuid().nullable().optional(),
   calidad: CalidadCafeEnum.nullable().optional(),
   fase_produccion: FaseCafeEnum.nullable().optional(),
+  cantidad_inicial: z.number({ message: "La cantidad debe ser un número." })
+    .min(0.01, "La cantidad debe ser mayor a 0.")
+    .max(10000, "La cantidad no puede superar 10000.")
+    .refine((val) => {
+      const str = val.toString();
+      if (str.includes(".")) {
+        return str.split(".")[1].length <= 2;
+      }
+      return true;
+    }, "La cantidad debe ser un número con hasta dos decimales.")
+    .optional()
+    .or(z.nan().optional()),
 });
 
 const ExpiryDateRefinement = (data: { fecha_caducidad?: string | null }) => {
@@ -263,4 +275,28 @@ export type UpdateInventarioItemInput = z.infer<typeof UpdateInventarioItemSchem
 export type UpdateEstadoInput = z.infer<typeof UpdateEstadoSchema>;
 export type InventarioItem = z.infer<typeof InventarioItemSchema>;
 export type MovimientoStockInput = z.infer<typeof MovimientoStockSchema>;
+
+export const CreateMovimientoFacturaSchema = z.object({
+  item_id: z.string().uuid(),
+  cantidad: z.number({ message: "La cantidad debe ser un número." })
+    .min(0.01, "La cantidad debe ser mayor a 0.")
+    .max(10000, "La cantidad no puede superar 10000.")
+    .refine((val) => {
+      const str = val.toString();
+      if (str.includes(".")) {
+        return str.split(".")[1].length <= 2;
+      }
+      return true;
+    }, "La cantidad debe ser un número con hasta dos decimales."),
+  unidad_medida: UnidadMedidaEnum,
+  numero_factura: z.string()
+    .length(17, "El número de factura debe tener exactamente 17 caracteres.")
+    .regex(/^[A-Za-z0-9]+$/, "El número de factura solo puede contener letras y números."),
+  fecha_entrada: z.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "El formato de fecha debe ser AAAA-MM-DD.")
+    .optional(),
+  tipo: z.enum(["ENTRADA", "SALIDA"]),
+});
+
+export type CreateMovimientoFacturaInput = z.infer<typeof CreateMovimientoFacturaSchema>;
 export type LoteCafe = z.infer<typeof LoteCafeSchema>;

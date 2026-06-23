@@ -4,18 +4,19 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { inventoryApi } from "@/lib/inventory-service";
+import { billingApi } from "@/lib/billing-service";
 import {
   Package, Plus, ArrowUpRight, ArrowDownLeft, Tag, Layers, Info,
   AlertTriangle, ClipboardList, Filter, BarChart3, Calendar,
   DollarSign, Edit, Trash2, History, CheckCircle2, XCircle,
-  Download, Activity, FileSpreadsheet
+  Download, Activity, FileSpreadsheet, LogIn
 } from "lucide-react";
 import {
   CreateInventarioItemSchema, CreateInventarioItemInput,
   UpdateInventarioItemSchema, UpdateInventarioItemInput,
   UpdateEstadoSchema, UpdateEstadoInput,
-  InventarioItem, MovimientoStockSchema, MovimientoStockInput,
-  TipoElementoEnum, EstadoInventarioEnum, UnidadMedidaEnum,
+  CreateMovimientoFacturaSchema, CreateMovimientoFacturaInput,
+  InventarioItem, TipoElementoEnum, EstadoInventarioEnum, UnidadMedidaEnum,
   EstadoInventario, ModuloInventarioEnum, CalidadCafeEnum, FaseCafeEnum
 } from "@/lib/schemas";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -58,6 +59,9 @@ const ProductFormFields = ({ register, errors, watch, setValue, isEdit = false }
     )}
     <Select label="Unidad" required value={watch("unidad_medida") || ""} options={UnidadMedidaEnum.options.map(u => ({ value: u, label: u }))} onValueChange={(val) => setValue("unidad_medida", val)} error={errors.unidad_medida?.message} />
     <Select label="Estado" required value={watch("estado") || (isEdit ? "" : "DISPONIBLE")} options={EstadoInventarioEnum.options.map(e => ({ value: e, label: e.replace("_", " ") }))} onValueChange={(val) => setValue("estado", val)} error={errors.estado?.message} />
+    {!isEdit && (
+      <Input label="Cant. Inicial" type="number" step="0.01" {...register("cantidad_inicial", { valueAsNumber: true })} error={errors.cantidad_inicial?.message} />
+    )}
     <div className="col-span-2">
       <Input label="Fecha Caducidad" type="date" {...register("fecha_caducidad")} error={errors.fecha_caducidad?.message} />
     </div>
@@ -94,7 +98,7 @@ export default function InventoryPage() {
 
   const { register: registerCreate, handleSubmit: handleSubmitCreate, reset: resetCreate, setValue: setCreateValue, watch: watchCreate, formState: { errors: errorsCreate } } = useForm<CreateInventarioItemInput>({
     resolver: zodResolver(CreateInventarioItemSchema),
-    defaultValues: { estado: "DISPONIBLE", tipo: "PRODUCTO", unidad_medida: "LIBRAS", modulo: "CAFETERIA", stock_minimo: 0 }
+    defaultValues: { estado: "DISPONIBLE", tipo: "PRODUCTO", unidad_medida: "LIBRAS", modulo: "CAFETERIA", stock_minimo: 0, cantidad_inicial: 0 }
   });
 
   const { register: registerEdit, handleSubmit: handleSubmitEdit, reset: resetEdit, setValue: setEditValue, watch: watchEdit, formState: { errors: errorsEdit } } = useForm<UpdateInventarioItemInput>({
@@ -105,9 +109,9 @@ export default function InventoryPage() {
     resolver: zodResolver(UpdateEstadoSchema)
   });
 
-  const { register: registerMove, handleSubmit: handleSubmitMove, reset: resetMove, setValue: setMoveValue, watch: watchMove, formState: { errors: errorsMove } } = useForm<MovimientoStockInput>({
-    resolver: zodResolver(MovimientoStockSchema),
-    defaultValues: { tipo: "ENTRADA" }
+  const { register: registerMove, handleSubmit: handleSubmitMove, reset: resetMove, setValue: setMoveValue, watch: watchMove, formState: { errors: errorsMove } } = useForm<CreateMovimientoFacturaInput>({
+    resolver: zodResolver(CreateMovimientoFacturaSchema),
+    defaultValues: { tipo: "ENTRADA", cantidad: 0, numero_factura: "", fecha_entrada: new Date().toISOString().split('T')[0] }
   });
 
   const selectedType = watchCreate("tipo");
@@ -222,16 +226,35 @@ export default function InventoryPage() {
     }
   };
 
-  const handleCreateMovement = async (data: MovimientoStockInput) => {
+  const generateInvoiceNumber = (sku: string) => {
+    const cleanSku = sku.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const prefix = cleanSku.substring(0, 8);
+    const randomLength = 17 - prefix.length;
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let randomPart = '';
+    for (let i = 0; i < randomLength; i++) {
+      randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return prefix + randomPart;
+  };
+
+  const handleCreateMovement = async (data: CreateMovimientoFacturaInput) => {
     setIsActionLoading(true);
     try {
-      await inventoryApi.createMovement(data);
-      toast.success("Movimiento registrado");
+      await billingApi.createMovimientoFactura(data);
+      toast.success(`${data.tipo === "ENTRADA" ? "Entrada" : "Salida"} registrada correctamente.`);
       setIsMovementModalOpen(false);
       resetMove();
       fetchData();
     } catch (err: any) {
-      handleError(err, "Registro de Movimiento");
+      const backendMessage = err.response?.data?.message || err.response?.data?.detail;
+      if (backendMessage === "La factura ya fue registrada anteriormente para este producto.") {
+        const newFactura = generateInvoiceNumber(selectedItem?.sku || "");
+        setMoveValue("numero_factura", newFactura);
+        toast.error("El documento ya existía y fue regenerado aleatoriamente. Confirma nuevamente.");
+      } else {
+        handleError(err, `Registro de ${data.tipo === "ENTRADA" ? "Entrada" : "Salida"}`);
+      }
     } finally {
       setIsActionLoading(false);
     }
@@ -304,7 +327,7 @@ export default function InventoryPage() {
       align: "right" as const,
       accessor: (item: InventarioItem) => (
         <div className="flex items-center justify-end gap-1">
-          <button onClick={() => { setSelectedItem(item); setMoveValue("item_id", item.id); setIsMovementModalOpen(true); }} className="p-1.5 text-secondary hover:bg-secondary/10 rounded-lg" title="Movimiento"><ArrowUpRight size={16} /></button>
+          <button onClick={() => { setSelectedItem(item); setMoveValue("item_id", item.id); setMoveValue("unidad_medida", item.unidad_medida as any); setMoveValue("numero_factura", generateInvoiceNumber(item.sku)); setIsMovementModalOpen(true); }} className="p-1.5 text-secondary hover:bg-secondary/10 rounded-lg" title="Movimiento"><ArrowUpRight size={16} /></button>
           <button onClick={() => { setSelectedItem(item); setStatusValue("estado", item.estado); setIsStatusModalOpen(true); }} className="p-1.5 text-amber-600 hover:bg-amber-600/10 rounded-lg" title="Estado"><Activity size={16} /></button>
           <button onClick={() => { setSelectedItem(item); setEditValue("nombre", item.nombre); setEditValue("precio", item.precio); setEditValue("stock_minimo", item.stock_minimo); setEditValue("unidad_medida", item.unidad_medida); setEditValue("estado", item.estado); setEditValue("descripcion", item.descripcion || ""); setEditValue("fecha_caducidad", item.fecha_caducidad ? new Date(item.fecha_caducidad).toISOString().split('T')[0] : ""); setIsEditModalOpen(true); }} className="p-1.5 text-tertiary hover:bg-tertiary/10 rounded-lg" title="Editar"><Edit size={16} /></button>
           <button onClick={() => { setSelectedItem(item); setIsHistoryModalOpen(true); setHistoryDates({ start: "", end: "" }); }} className="p-1.5 text-primary hover:bg-primary/10 rounded-lg" title="Historial"><History size={16} /></button>
@@ -376,10 +399,38 @@ export default function InventoryPage() {
 
       <Dialog isOpen={isStatusModalOpen} onOpenChange={setIsStatusModalOpen} title="Actualizar Disponibilidad"><form onSubmit={handleSubmitStatus(handleUpdateStatus)} className="space-y-6 pt-2"><Select label="Nuevo Estado" required value={watchStatus("estado") || ""} options={EstadoInventarioEnum.options.map(s => ({ value: s, label: s.replace("_", " ") }))} onValueChange={(val) => setStatusValue("estado", val as EstadoInventario)} /><button type="submit" className="w-full h-12 bg-primary text-white rounded-xl font-bold uppercase shadow-lg">GUARDAR</button></form></Dialog>
 
-      <Dialog isOpen={isMovementModalOpen} onOpenChange={setIsMovementModalOpen} title="Entrada / Salida de Stock"><form onSubmit={handleSubmitMove(handleCreateMovement)} className="space-y-6 pt-2"><div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex items-center justify-between"><div><span className="text-[10px] font-black text-primary/60 uppercase">Existencia</span><p className="text-2xl font-black text-primary leading-none mt-1">{selectedItem?.cantidad ?? 0} <span className="text-xs text-outline">{selectedItem?.unidad_medida}</span></p></div><div className={`px-4 py-1.5 rounded-full text-[10px] font-black border ${(selectedItem?.cantidad ?? 0) <= (selectedItem?.stock_minimo || 0) ? 'bg-error-container/20 text-error border-error' : 'bg-green-50 text-green-700 border-green-200'}`}>{(selectedItem?.cantidad ?? 0) <= (selectedItem?.stock_minimo || 0) ? 'REABASTECER' : 'SUFICIENTE'}</div></div><div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2 flex p-1 bg-surface-container-high rounded-xl"><button type="button" onClick={() => setMoveValue("tipo", "ENTRADA")} className={`flex-1 py-3 rounded-lg font-black text-xs transition-all ${moveType === "ENTRADA" ? "bg-green-600 text-white shadow-md" : "text-outline hover:bg-white/50"}`}>ENTRADA</button><button type="button" onClick={() => setMoveValue("tipo", "SALIDA")} className={`flex-1 py-3 rounded-lg font-black text-xs transition-all ${moveType === "SALIDA" ? "bg-error text-white shadow-md" : "text-outline hover:bg-white/50"}`}>SALIDA</button></div><Input label="Cantidad" type="number" step="0.01" required {...registerMove("cantidad", { valueAsNumber: true })} error={errorsMove.cantidad?.message} /><Input label="Motivo" required placeholder="Ej: Compra, Venta, Merma..." {...registerMove("motivo")} error={errorsMove.motivo?.message} /></div><button type="submit" className={`w-full h-12 rounded-xl font-bold text-white shadow-lg transition-all ${moveType === "ENTRADA" ? "bg-green-600 shadow-green-200" : "bg-error shadow-error/20"}`}>CONFIRMAR {moveType}</button></form></Dialog>
+      <Dialog isOpen={isMovementModalOpen} onOpenChange={setIsMovementModalOpen} title="Movimiento de Stock">
+        <form onSubmit={handleSubmitMove(handleCreateMovement)} className="space-y-4 pt-2">
+          <div className="p-3 bg-surface-container rounded-xl border border-outline-variant/20 flex gap-3 items-center">
+            <div className="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center text-primary border border-outline-variant/10">
+              <Package size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-outline uppercase tracking-widest">{selectedItem?.sku}</p>
+              <p className="text-sm font-bold text-on-surface">{selectedItem?.nombre}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 flex p-1 bg-surface-container-high rounded-xl">
+              <button type="button" onClick={() => setMoveValue("tipo", "ENTRADA")} className={`flex-1 py-3 rounded-lg font-black text-xs transition-all ${moveType === "ENTRADA" ? "bg-green-600 text-white shadow-md" : "text-outline hover:bg-white/50"}`}>ENTRADA</button>
+              <button type="button" onClick={() => setMoveValue("tipo", "SALIDA")} className={`flex-1 py-3 rounded-lg font-black text-xs transition-all ${moveType === "SALIDA" ? "bg-error text-white shadow-md" : "text-outline hover:bg-white/50"}`}>SALIDA</button>
+            </div>
+            <Input label="Cantidad" type="number" step="0.01" required {...registerMove("cantidad", { valueAsNumber: true })} error={errorsMove.cantidad?.message} />
+            <Select label="Unidad" required value={watchMove("unidad_medida") || ""} options={UnidadMedidaEnum.options.map(u => ({ value: u, label: u }))} onValueChange={(val) => setMoveValue("unidad_medida", val as any)} error={errorsMove.unidad_medida?.message} />
+            <div className="col-span-2">
+              <Input label="Número de Factura / Doc (Auto)" readOnly required {...registerMove("numero_factura")} error={errorsMove.numero_factura?.message} className="bg-surface-container/50 opacity-70 pointer-events-none" />
+            </div>
+            <div className="col-span-2">
+              <Input label="Fecha" type="date" required {...registerMove("fecha_entrada")} error={errorsMove.fecha_entrada?.message} />
+            </div>
+          </div>
+          <button type="submit" className={`w-full h-12 text-white rounded-xl font-bold uppercase shadow-lg transition-all disabled:opacity-50 ${moveType === "ENTRADA" ? "bg-green-600 shadow-green-200" : "bg-error shadow-error/20"}`} disabled={isActionLoading}>
+            {isActionLoading ? "Procesando..." : `Confirmar ${moveType}`}
+          </button>
+        </form>
+      </Dialog>
 
-      <Dialog isOpen={isHistoryModalOpen} onOpenChange={setIsHistoryModalOpen} title="Historial de Movimientos"><div className="space-y-4"><div className="grid grid-cols-2 gap-2"><Input label="Desde" type="date" value={historyDates.start} onChange={(e) => setHistoryDates(prev => ({ ...prev, start: e.target.value }))} /><Input label="Hasta" type="date" value={historyDates.end} onChange={(e) => setHistoryDates(prev => ({ ...prev, end: e.target.value }))} /></div><div className="max-h-[300px] overflow-y-auto border border-outline-variant/20 rounded-2xl"><table className="w-full text-left"><thead className="sticky top-0 bg-surface-container-high"><tr className="border-b border-outline-variant/20"><th className="px-4 py-3 text-[10px] font-black uppercase">Fecha</th><th className="px-4 py-3 text-[10px] font-black uppercase text-center">Tipo</th><th className="px-4 py-3 text-[10px] font-black uppercase text-right">Cantidad</th></tr></thead><tbody>{movements.map((m) => (<tr key={m.id} className="border-b border-outline-variant/10 hover:bg-surface-container transition-colors"><td className="px-4 py-4 text-[11px] font-medium text-outline">{new Date(m.fecha).toLocaleString()}</td><td className="px-4 py-4 text-center"><div className={`inline-flex items-center gap-2 font-black text-[10px] px-2 py-1 rounded-lg ${m.tipo === 'ENTRADA' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-error'}`}>{m.tipo}</div><p className="text-[9px] text-outline mt-1 italic">{m.motivo}</p></td><td className="px-4 py-4 text-xs font-black text-primary text-right">{m.cantidad.toLocaleString()}</td></tr>))}</tbody></table>{movements.length === 0 && <div className="p-10 text-center text-[10px] font-bold text-outline uppercase tracking-widest">Sin registros encontrados</div>}</div></div></Dialog>
+      <Dialog isOpen={isHistoryModalOpen} onOpenChange={setIsHistoryModalOpen} title="Historial de Movimientos"><div className="space-y-4"><div className="grid grid-cols-2 gap-2"><Input label="Desde" type="date" value={historyDates.start} onChange={(e) => setHistoryDates(prev => ({ ...prev, start: e.target.value }))} /><Input label="Hasta" type="date" value={historyDates.end} onChange={(e) => setHistoryDates(prev => ({ ...prev, end: e.target.value }))} /></div><div className="max-h-[300px] overflow-y-auto border border-outline-variant/20 rounded-2xl"><table className="w-full text-left"><thead className="sticky top-0 bg-surface-container-high"><tr className="border-b border-outline-variant/20"><th className="px-4 py-3 text-[10px] font-black uppercase">Fecha</th><th className="px-4 py-3 text-[10px] font-black uppercase text-center">Tipo</th><th className="px-4 py-3 text-[10px] font-black uppercase text-right">Cantidad</th></tr></thead><tbody>{movements.map((m) => (<tr key={m.id} className="border-b border-outline-variant/10 hover:bg-surface-container transition-colors"><td className="px-4 py-4 text-[11px] font-medium text-outline">{new Date(m.fecha).toLocaleString()}</td><td className="px-4 py-4 text-center"><div className={`inline-flex items-center gap-2 font-black text-[10px] px-2 py-1 rounded-lg ${m.tipo === 'ENTRADA' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-error'}`}>{m.tipo}</div><p className="text-[9px] text-outline mt-1 italic">{m.motivo}</p>{(m as any).numero_factura && <p className="text-[9px] text-primary font-bold mt-1">Factura: {(m as any).numero_factura}</p>}</td><td className="px-4 py-4 text-xs font-black text-primary text-right">{m.cantidad.toLocaleString()}</td></tr>))}</tbody></table>{movements.length === 0 && <div className="p-10 text-center text-[10px] font-bold text-outline uppercase tracking-widest">Sin registros encontrados</div>}</div></div></Dialog>
     </div>
   );
 }
