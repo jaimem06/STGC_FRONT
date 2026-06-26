@@ -8,6 +8,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   icon?: LucideIcon;
   error?: string;
   rightElement?: React.ReactNode;
+  inputClassName?: string;
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(({
@@ -16,6 +17,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
   error,
   className = "",
   rightElement,
+  inputClassName = "",
   ...props
 }, ref) => {
   return (
@@ -38,7 +40,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
             error 
               ? "border-error focus:ring-2 focus:ring-error/10" 
               : "border-outline-variant/20 focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
-          }`}
+          } ${inputClassName}`}
           {...props}
         />
         {rightElement && (

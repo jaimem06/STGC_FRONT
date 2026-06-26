@@ -9,7 +9,7 @@ import {
   Package, Plus, ArrowUpRight, ArrowDownLeft, Tag, Layers, Info,
   AlertTriangle, ClipboardList, Filter, BarChart3, Calendar,
   DollarSign, Edit, Trash2, History, CheckCircle2, XCircle,
-  Download, Activity, FileSpreadsheet, LogIn
+  Download, Activity, FileSpreadsheet, LogIn, RefreshCw
 } from "lucide-react";
 import {
   CreateInventarioItemSchema, CreateInventarioItemInput,
@@ -58,13 +58,15 @@ const ProductFormFields = ({ register, errors, watch, setValue, isEdit = false }
       <Select label="Categoría" required value={watch("tipo") || ""} options={TipoElementoEnum.options.map(t => ({ value: t, label: t.replace("_", " ") }))} onValueChange={(val) => setValue("tipo", val)} error={errors.tipo?.message} />
     )}
     <Select label="Unidad" required value={watch("unidad_medida") || ""} options={UnidadMedidaEnum.options.map(u => ({ value: u, label: u }))} onValueChange={(val) => setValue("unidad_medida", val)} error={errors.unidad_medida?.message} />
-    <Select label="Estado" required value={watch("estado") || (isEdit ? "" : "DISPONIBLE")} options={EstadoInventarioEnum.options.map(e => ({ value: e, label: e.replace("_", " ") }))} onValueChange={(val) => setValue("estado", val)} error={errors.estado?.message} />
     {!isEdit && (
-      <Input label="Cant. Inicial" type="number" step="0.01" {...register("cantidad_inicial", { valueAsNumber: true })} error={errors.cantidad_inicial?.message} />
+      <Select label="Estado" required value={watch("estado") || "DISPONIBLE"} options={EstadoInventarioEnum.options.map(e => ({ value: e, label: e.replace("_", " ") }))} onValueChange={(val) => setValue("estado", val)} error={errors.estado?.message} />
     )}
-    <div className="col-span-2">
-      <Input label="Fecha Caducidad" type="date" {...register("fecha_caducidad")} error={errors.fecha_caducidad?.message} />
-    </div>
+    {!isEdit && (
+      <>
+        <Input label="Cant. Inicial" type="number" step="0.01" {...register("cantidad_inicial", { valueAsNumber: true })} error={errors.cantidad_inicial?.message} />
+        <Input label="Fecha Caducidad" type="date" {...register("fecha_caducidad")} error={errors.fecha_caducidad?.message} />
+      </>
+    )}
     <div className="col-span-2">
       <label className="block font-label text-[9px] font-bold uppercase tracking-widest text-outline ml-1 mb-1">Descripción <span className="text-error">*</span></label>
       <div className="relative">
@@ -180,13 +182,9 @@ export default function InventoryPage() {
 
   const handleEditItem = async (data: UpdateInventarioItemInput) => {
     if (!selectedItem) return;
-    const cleanData = {
-      ...data,
-      fecha_caducidad: data.fecha_caducidad === "" ? null : data.fecha_caducidad,
-    };
     setIsActionLoading(true);
     try {
-      await inventoryApi.updateItem(selectedItem.id, cleanData);
+      await inventoryApi.updateItem(selectedItem.id, data);
       toast.success("Actualización exitosa");
       setIsEditModalOpen(false);
       fetchData();
@@ -240,8 +238,12 @@ export default function InventoryPage() {
 
   const handleCreateMovement = async (data: CreateMovimientoFacturaInput) => {
     setIsActionLoading(true);
+    const cleanData = {
+      ...data,
+      fecha_caducidad: data.fecha_caducidad === "" ? undefined : data.fecha_caducidad
+    };
     try {
-      await billingApi.createMovimientoFactura(data);
+      await billingApi.createMovimientoFactura(cleanData);
       toast.success(`${data.tipo === "ENTRADA" ? "Entrada" : "Salida"} registrada correctamente.`);
       setIsMovementModalOpen(false);
       resetMove();
@@ -327,9 +329,9 @@ export default function InventoryPage() {
       align: "right" as const,
       accessor: (item: InventarioItem) => (
         <div className="flex items-center justify-end gap-1">
-          <button onClick={() => { setSelectedItem(item); setMoveValue("item_id", item.id); setMoveValue("unidad_medida", item.unidad_medida as any); setMoveValue("numero_factura", generateInvoiceNumber(item.sku)); setIsMovementModalOpen(true); }} className="p-1.5 text-secondary hover:bg-secondary/10 rounded-lg" title="Movimiento"><ArrowUpRight size={16} /></button>
+          <button onClick={() => { setSelectedItem(item); setMoveValue("item_id", item.id); setMoveValue("unidad_medida", item.unidad_medida as any); setMoveValue("numero_factura", ""); setIsMovementModalOpen(true); }} className="p-1.5 text-secondary hover:bg-secondary/10 rounded-lg" title="Movimiento"><ArrowUpRight size={16} /></button>
           <button onClick={() => { setSelectedItem(item); setStatusValue("estado", item.estado); setIsStatusModalOpen(true); }} className="p-1.5 text-amber-600 hover:bg-amber-600/10 rounded-lg" title="Estado"><Activity size={16} /></button>
-          <button onClick={() => { setSelectedItem(item); setEditValue("nombre", item.nombre); setEditValue("precio", item.precio); setEditValue("stock_minimo", item.stock_minimo); setEditValue("unidad_medida", item.unidad_medida); setEditValue("estado", item.estado); setEditValue("descripcion", item.descripcion || ""); setEditValue("fecha_caducidad", item.fecha_caducidad ? new Date(item.fecha_caducidad).toISOString().split('T')[0] : ""); setIsEditModalOpen(true); }} className="p-1.5 text-tertiary hover:bg-tertiary/10 rounded-lg" title="Editar"><Edit size={16} /></button>
+          <button onClick={() => { setSelectedItem(item); setEditValue("nombre", item.nombre); setEditValue("precio", item.precio); setEditValue("stock_minimo", item.stock_minimo); setEditValue("unidad_medida", item.unidad_medida); setEditValue("descripcion", item.descripcion || ""); setIsEditModalOpen(true); }} className="p-1.5 text-tertiary hover:bg-tertiary/10 rounded-lg" title="Editar"><Edit size={16} /></button>
           <button onClick={() => { setSelectedItem(item); setIsHistoryModalOpen(true); setHistoryDates({ start: "", end: "" }); }} className="p-1.5 text-primary hover:bg-primary/10 rounded-lg" title="Historial"><History size={16} /></button>
           <button onClick={() => handleDeleteItem(item.id)} className="p-1.5 text-error hover:bg-error/10 rounded-lg" title="Eliminar"><Trash2 size={16} /></button>
         </div>
@@ -383,14 +385,14 @@ export default function InventoryPage() {
       </div>
 
       {/* Modales actualizados */}
-      <Dialog isOpen={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} title="Crear Producto">
+      <Dialog isOpen={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} title="Crear Producto/Insumo">
         <form onSubmit={handleSubmitCreate(handleCreateItem)} className="space-y-4 pt-2">
           <ProductFormFields register={registerCreate} errors={errorsCreate} watch={watchCreate} setValue={setCreateValue} />
           <button type="submit" className="w-full h-12 bg-primary text-white rounded-xl font-bold uppercase tracking-widest shadow-lg">GUARDAR</button>
         </form>
       </Dialog>
 
-      <Dialog isOpen={isEditModalOpen} onOpenChange={setIsEditModalOpen} title="Editar Producto">
+      <Dialog isOpen={isEditModalOpen} onOpenChange={setIsEditModalOpen} title="Editar Producto/Insumo">
         <form onSubmit={handleSubmitEdit(handleEditItem)} className="space-y-4 pt-2">
           <ProductFormFields register={registerEdit} errors={errorsEdit} watch={watchEdit} setValue={setEditValue} isEdit />
           <button type="submit" className="w-full h-12 bg-tertiary text-white rounded-xl font-bold uppercase shadow-lg">ACTUALIZAR</button>
@@ -418,11 +420,29 @@ export default function InventoryPage() {
             <Input label="Cantidad" type="number" step="0.01" required {...registerMove("cantidad", { valueAsNumber: true })} error={errorsMove.cantidad?.message} />
             <Select label="Unidad" required value={watchMove("unidad_medida") || ""} options={UnidadMedidaEnum.options.map(u => ({ value: u, label: u }))} onValueChange={(val) => setMoveValue("unidad_medida", val as any)} error={errorsMove.unidad_medida?.message} />
             <div className="col-span-2">
-              <Input label="Número de Factura / Doc (Auto)" readOnly required {...registerMove("numero_factura")} error={errorsMove.numero_factura?.message} className="bg-surface-container/50 opacity-70 pointer-events-none" />
+              <Input 
+                label="Número de Factura / Doc" 
+                required 
+                {...registerMove("numero_factura")} 
+                error={errorsMove.numero_factura?.message} 
+                inputClassName="!pr-[85px] uppercase transition-colors" 
+                placeholder="Ingrese código..." 
+                rightElement={
+                  <button type="button" onClick={() => setMoveValue("numero_factura", generateInvoiceNumber(selectedItem?.sku || ""))} className="flex items-center gap-1.5 p-1 px-1.5 text-primary bg-primary/5 hover:bg-primary/10 border border-primary/10 rounded-lg transition-all opacity-80 hover:opacity-100" title="Generar código automático">
+                    <RefreshCw size={13} strokeWidth={2.5} />
+                    <span className="text-[9px] font-black uppercase tracking-widest">Generar</span>
+                  </button>
+                }
+              />
             </div>
             <div className="col-span-2">
               <Input label="Fecha" type="date" required {...registerMove("fecha_entrada")} error={errorsMove.fecha_entrada?.message} />
             </div>
+            {moveType === "ENTRADA" && (
+              <div className="col-span-2">
+                <Input label="Fecha de Caducidad (Lote)" type="date" {...registerMove("fecha_caducidad")} error={errorsMove.fecha_caducidad?.message} />
+              </div>
+            )}
           </div>
           <button type="submit" className={`w-full h-12 text-white rounded-xl font-bold uppercase shadow-lg transition-all disabled:opacity-50 ${moveType === "ENTRADA" ? "bg-green-600 shadow-green-200" : "bg-error shadow-error/20"}`} disabled={isActionLoading}>
             {isActionLoading ? "Procesando..." : `Confirmar ${moveType}`}

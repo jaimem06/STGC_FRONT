@@ -225,13 +225,11 @@ export const CreateInventarioItemSchema = BaseInventarioItemObject.refine(
 
 export const UpdateInventarioItemSchema = BaseInventarioItemObject.pick({
   nombre: true,
-  estado: true,
   precio: true,
-  descripcion: true,
   stock_minimo: true,
   unidad_medida: true,
-  fecha_caducidad: true,
-}).refine(ExpiryDateRefinement, ExpiryDateMessage);
+  descripcion: true,
+});
 
 export const UpdateEstadoSchema = z.object({
   estado: EstadoInventarioEnum,
@@ -295,6 +293,10 @@ export const CreateMovimientoFacturaSchema = z.object({
   fecha_entrada: z.string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "El formato de fecha debe ser AAAA-MM-DD.")
     .optional(),
+  fecha_caducidad: z.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "El formato de fecha debe ser AAAA-MM-DD.")
+    .optional()
+    .or(z.literal("")),
   tipo: z.enum(["ENTRADA", "SALIDA"]),
 });
 
