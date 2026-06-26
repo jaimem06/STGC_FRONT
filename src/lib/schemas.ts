@@ -137,17 +137,32 @@ export const EstadoInventarioEnum = z.enum([
   "BLOQUEADO",
   "CADUCADO",
 ], {
-  message: "El estado del producto no es válido. Los estados permitidos son: DISPONIBLE, AGOTADO, STOCK_BAJO, INACTIVO, EN_TRANSITO, BLOQUEADO y CADUCADO."
-});
+  errorMap: (issue: any, _ctx: any) => {
+    if (issue.code === "invalid_enum_value") {
+      return { message: "El estado del producto no es válido. Los estados permitidos son: DISPONIBLE, AGOTADO, STOCK_BAJO, INACTIVO, EN_TRANSITO, BLOQUEADO y CADUCADO." };
+    }
+    return { message: "El estado del producto es obligatorio." };
+  }
+} as any);
 export const FaseCafeEnum = z.enum(["PULPA", "DESPULPADO", "SECADO", "TOSTADO", "MOLIDO"]);
 export type FaseCafe = z.infer<typeof FaseCafeEnum>;
 export const TipoElementoEnum = z.enum(["INSUMO", "PRODUCTO", "CAFE_PROCESADO"], {
-  message: "La categoría seleccionada no es válida. Las opciones permitidas son: PRODUCTO, INSUMO y CAFE PROCESADO."
-});
+  errorMap: (issue: any, _ctx: any) => {
+    if (issue.code === "invalid_enum_value") {
+      return { message: "La categoría seleccionada no es válida. Las opciones permitidas son: PRODUCTO, INSUMO y CAFE PROCESADO." };
+    }
+    return { message: "La categoría es obligatoria." };
+  }
+} as any);
 export const TipoMovimientoEnum = z.enum(["ENTRADA", "SALIDA"]);
 export const UnidadMedidaEnum = z.enum(["QUINTALES", "ARROBAS", "LIBRAS", "UNIDADES", "LITROS", "KILOGRAMOS"], {
-  message: "La unidad de medida no es válida. Seleccione una de las opciones del catálogo: QUINTALES, ARROBAS, LIBRAS, UNIDADES, LITROS o KILOGRAMOS."
-});
+  errorMap: (issue: any, _ctx: any) => {
+    if (issue.code === "invalid_enum_value") {
+      return { message: "La unidad de medida no es válida. Seleccione una de las opciones del catálogo: QUINTALES, ARROBAS, LIBRAS, UNIDADES, LITROS o KILOGRAMOS." };
+    }
+    return { message: "La unidad de medida es obligatoria." };
+  }
+} as any);
 export const ModuloInventarioEnum = z.enum(["FINCA", "CAFETERIA"]);
 
 // Base schema for extending
@@ -155,6 +170,7 @@ const BaseInventarioItemObject = z.object({
   sku: z.string({ message: "El SKU es obligatorio." })
     .min(1, "El SKU es obligatorio.")
     .length(6, "El SKU debe tener exactamente 6 caracteres.")
+    .regex(/^[A-Z0-9]+$/, "El SKU solo puede contener letras mayúsculas y números.")
     .regex(/^[A-Z]{3}\d{3}$/, "El SKU debe tener 3 letras mayúsculas seguidas de 3 números."),
   nombre: z.string({ message: "El nombre del producto es obligatorio." })
     .min(1, "El nombre del producto es obligatorio.")
@@ -191,16 +207,9 @@ const BaseInventarioItemObject = z.object({
   codigo_trazabilidad: z.string().uuid().nullable().optional(),
   calidad: CalidadCafeEnum.nullable().optional(),
   fase_produccion: FaseCafeEnum.nullable().optional(),
-  cantidad_inicial: z.number({ message: "La cantidad debe ser un número." })
-    .min(0.01, "La cantidad debe ser mayor a 0.")
-    .max(10000, "La cantidad no puede superar 10000.")
-    .refine((val) => {
-      const str = val.toString();
-      if (str.includes(".")) {
-        return str.split(".")[1].length <= 2;
-      }
-      return true;
-    }, "La cantidad debe ser un número con hasta dos decimales.")
+  cantidad_inicial: z.number({ message: "La cantidad inicial es obligatoria." })
+    .min(0, "La cantidad inicial no puede ser un número negativo.")
+    .max(10000, "La cantidad inicial no puede superar 10000.")
     .optional()
     .or(z.nan().optional()),
 });
@@ -247,7 +256,10 @@ export const MovimientoStockSchema = z.object({
   id: z.string().uuid().optional(),
   item_id: z.string().uuid("ID de ítem inválido"),
   lote_id: z.string().uuid().nullable().optional(),
-  cantidad: z.number().positive("La cantidad debe ser positiva"),
+  cantidad: z.number({ message: "La cantidad es obligatoria." })
+    .refine(val => val !== 0, "La cantidad debe ser mayor a 0.")
+    .refine(val => val >= 0, "La cantidad no puede ser un número negativo.")
+    .refine(val => val <= 10000, "La cantidad no puede superar 10000."),
   tipo: TipoMovimientoEnum,
   fecha: z.string().optional(),
   motivo: z.string().min(1, "El motivo es requerido"),
@@ -276,18 +288,13 @@ export type MovimientoStockInput = z.infer<typeof MovimientoStockSchema>;
 
 export const CreateMovimientoFacturaSchema = z.object({
   item_id: z.string().uuid(),
-  cantidad: z.number({ message: "La cantidad debe ser un número." })
-    .min(0.01, "La cantidad debe ser mayor a 0.")
-    .max(10000, "La cantidad no puede superar 10000.")
-    .refine((val) => {
-      const str = val.toString();
-      if (str.includes(".")) {
-        return str.split(".")[1].length <= 2;
-      }
-      return true;
-    }, "La cantidad debe ser un número con hasta dos decimales."),
+  cantidad: z.number({ message: "La cantidad es obligatoria." })
+    .refine(val => val !== 0, "La cantidad debe ser mayor a 0.")
+    .refine(val => val >= 0, "La cantidad no puede ser un número negativo.")
+    .refine(val => val <= 10000, "La cantidad no puede superar 10000."),
   unidad_medida: UnidadMedidaEnum,
-  numero_factura: z.string()
+  numero_factura: z.string({ message: "El número de factura es obligatorio." })
+    .min(1, "El número de factura es obligatorio.")
     .length(17, "El número de factura debe tener exactamente 17 caracteres.")
     .regex(/^[A-Za-z0-9]+$/, "El número de factura solo puede contener letras y números."),
   fecha_entrada: z.string()
