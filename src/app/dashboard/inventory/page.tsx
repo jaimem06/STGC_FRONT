@@ -169,7 +169,7 @@ export default function InventoryPage() {
     setIsActionLoading(true);
     try {
       await inventoryApi.createItem(cleanData);
-      toast.success("Producto/insumo registrado exitosamente");
+      toast.success("Producto/insumo registrado exitosamente.");
       setIsCreateModalOpen(false);
       resetCreate();
       fetchData();
@@ -185,7 +185,7 @@ export default function InventoryPage() {
     setIsActionLoading(true);
     try {
       await inventoryApi.updateItem(selectedItem.id, data);
-      toast.success("Actualización exitosa");
+      toast.success("Producto/insumo actualizado exitosamente.");
       setIsEditModalOpen(false);
       fetchData();
     } catch (err: any) {
