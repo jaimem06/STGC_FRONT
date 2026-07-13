@@ -18,28 +18,86 @@ export interface CartItem {
   cantidad: number;
 }
 
+export interface PagoInput {
+  metodoPago: string;
+  monto: number;
+  referencia_pago?: string;
+}
+
+export interface PedidoItem {
+  id: string;
+  productoId: string;
+  nombre: string;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+}
+
+export interface PedidoPago {
+  id: string;
+  metodoPago: string;
+  monto: number;
+  referencia?: string;
+}
+
+export interface Pedido {
+  id: string;
+  cajero_id: string;
+  cliente_nombre?: string;
+  cliente_apellido?: string;
+  cliente_cedula?: string;
+  items: PedidoItem[];
+  pagos: PedidoPago[];
+  subtotal: number;
+  iva: number;
+  total: number;
+  estado: string;
+  numeracion_comprobante?: number;
+  fechaCreacion: string;
+}
+
+interface CierreResult {
+  turno: any;
+  resumen: {
+    totalTransacciones: number;
+    montoVentasTotal: number;
+    ventas_efectivo: number;
+    desglose: Record<string, number>;
+  };
+}
+
 interface PosState {
   productos: Product[];
   cart: CartItem[];
+  pedidosActivos: Pedido[];
+  pedidoEnCobro: string | null;
   clienteNombre: string;
+  clienteApellido: string;
   clienteCedula: string;
   isRegisterOpen: boolean;
   loading: boolean;
   fetchProductos: () => Promise<void>;
+  fetchPedidosActivos: () => Promise<void>;
   addToCart: (producto: Product) => void;
   removeFromCart: (productoId: string) => void;
   updateQuantity: (productoId: string, cantidad: number) => void;
   clearCart: () => void;
-  setCliente: (nombre: string, cedula: string) => void;
-  checkout: (metodoPago: string, montoRecibido: number) => Promise<{ success: boolean; pedidoId?: string; vuelto?: number }>;
+  setCliente: (nombre: string, apellido: string, cedula: string) => void;
+  guardarPedido: () => Promise<boolean>;
+  cancelPedidoEnCobro: () => Promise<void>;
+  loadPedidoForCheckout: (pedido: Pedido) => void;
+  checkout: (pagos: PagoInput[]) => Promise<{ success: boolean; pedidoId?: string }>;
   abrirCaja: (monto: number) => Promise<boolean>;
-  cerrarCaja: (monto: number) => Promise<boolean>;
+  cerrarCaja: (monto: number) => Promise<CierreResult | null>;
 }
 
 export const usePosStore = create<PosState>((set, get) => ({
   productos: [],
   cart: [],
+  pedidosActivos: [],
+  pedidoEnCobro: null,
   clienteNombre: "Consumidor Final",
+  clienteApellido: "",
   clienteCedula: "9999999999",
   isRegisterOpen: false,
   loading: false,
@@ -47,7 +105,6 @@ export const usePosStore = create<PosState>((set, get) => ({
   fetchProductos: async () => {
     set({ loading: true });
     try {
-      // Check register state first
       try {
         const estadoRes = await posService.getEstadoCaja();
         set({ isRegisterOpen: estadoRes.isRegisterOpen });
@@ -71,10 +128,19 @@ export const usePosStore = create<PosState>((set, get) => ({
     }
   },
 
+  fetchPedidosActivos: async () => {
+    try {
+      const pedidos = await posService.getPedidosActivos();
+      set({ pedidosActivos: pedidos || [] });
+    } catch (e) {
+      console.error("Error fetching active orders", e);
+    }
+  },
+
   addToCart: (producto: Product) => {
     const { cart } = get();
     const existing = cart.find((item) => item.productoId === producto.id);
-    
+
     if (existing) {
       if (existing.cantidad >= producto.stockActual) {
         toast.warning("Stock insuficiente");
@@ -120,34 +186,103 @@ export const usePosStore = create<PosState>((set, get) => ({
     });
   },
 
-  clearCart: () => set({ cart: [], clienteNombre: "Consumidor Final", clienteCedula: "9999999999" }),
+  clearCart: () => set({ cart: [], clienteNombre: "Consumidor Final", clienteApellido: "", clienteCedula: "9999999999" }),
 
-  setCliente: (nombre, cedula) => set({ clienteNombre: nombre, clienteCedula: cedula }),
+  cancelPedidoEnCobro: async () => {
+    const { pedidoEnCobro } = get();
+    if (!pedidoEnCobro) return;
+    try {
+      await posService.anularPedido(pedidoEnCobro);
+      toast.success("Pedido cancelado");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || "Error al cancelar pedido");
+    }
+    set({ cart: [], pedidoEnCobro: null, clienteNombre: "Consumidor Final", clienteApellido: "", clienteCedula: "9999999999" });
+    await get().fetchPedidosActivos();
+  },
 
-  checkout: async (metodoPago, montoRecibido) => {
-    const { cart, clienteNombre, clienteCedula, clearCart, fetchProductos } = get();
-    if (cart.length === 0) return { success: false };
+  setCliente: (nombre, apellido, cedula) => set({ clienteNombre: nombre, clienteApellido: apellido, clienteCedula: cedula }),
+
+  guardarPedido: async () => {
+    const { cart, clienteNombre, clienteApellido, clienteCedula, clearCart, fetchPedidosActivos } = get();
+    if (cart.length === 0) return false;
 
     set({ loading: true });
     try {
-      // 1. Crear Pedido
-      const pedido = await posService.crearPedido({
+      await posService.crearPedido({
         cliente_nombre: clienteNombre,
+        cliente_apellido: clienteApellido,
         cliente_cedula: clienteCedula,
         items: cart
       });
+      toast.success("Pedido guardado en edición");
+      clearCart();
+      await fetchPedidosActivos();
+      set({ loading: false });
+      return true;
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || "Error al guardar pedido");
+      set({ loading: false });
+      return false;
+    }
+  },
 
-      // 2. Pagar Pedido
-      const pagoResult = await posService.pagarPedido(pedido.id, {
-        metodoPago,
-        montoRecibido
-      });
+  loadPedidoForCheckout: (pedido: Pedido) => {
+    const cart: CartItem[] = pedido.items.map(i => ({
+      productoId: i.productoId,
+      nombre: i.nombre,
+      precioUnitario: i.precioUnitario,
+      cantidad: i.cantidad
+    }));
+    set({
+      cart,
+      pedidoEnCobro: pedido.id,
+      clienteNombre: pedido.cliente_nombre || "Consumidor Final",
+      clienteApellido: pedido.cliente_apellido || "",
+      clienteCedula: pedido.cliente_cedula || "9999999999"
+    });
+  },
+
+  checkout: async (pagos) => {
+    const { cart, pedidoEnCobro, clienteNombre, clienteApellido, clienteCedula, clearCart, fetchProductos } = get();
+    if (cart.length === 0) return { success: false };
+    if (pagos.length === 0) {
+      toast.error("Debe registrar al menos un método de pago para continuar");
+      return { success: false };
+    }
+
+    set({ loading: true });
+    let pedidoId = pedidoEnCobro ?? "";
+    try {
+      if (pedidoEnCobro) {
+        await posService.actualizarPedido(pedidoEnCobro, {
+          cliente_nombre: clienteNombre,
+          cliente_apellido: clienteApellido,
+          cliente_cedula: clienteCedula,
+          items: cart.map(i => ({
+            productoId: i.productoId,
+            nombre: i.nombre,
+            cantidad: i.cantidad,
+            precioUnitario: i.precioUnitario
+          }))
+        });
+      } else {
+        const nuevo = await posService.crearPedido({
+          cliente_nombre: clienteNombre,
+          cliente_apellido: clienteApellido,
+          cliente_cedula: clienteCedula,
+          items: cart
+        });
+        pedidoId = nuevo.id;
+      }
+      await posService.pagarPedido(pedidoId, { pagos });
 
       toast.success("Pago procesado con éxito");
       clearCart();
-      await fetchProductos(); // refresh stock
+      set({ pedidoEnCobro: null });
+      await fetchProductos();
       set({ loading: false });
-      return { success: true, pedidoId: pedido.id, vuelto: pagoResult.vuelto };
+      return { success: true, pedidoId };
     } catch (error: any) {
       toast.error(error?.response?.data?.error || "Error al procesar el pago");
       set({ loading: false });
@@ -161,6 +296,8 @@ export const usePosStore = create<PosState>((set, get) => ({
       await posService.abrirTurno(monto);
       set({ isRegisterOpen: true, loading: false });
       toast.success("Caja abierta exitosamente");
+      get().fetchProductos();
+      get().fetchPedidosActivos();
       return true;
     } catch (error: any) {
       toast.error(error?.response?.data?.error || "Error al abrir caja");
@@ -173,17 +310,17 @@ export const usePosStore = create<PosState>((set, get) => ({
     set({ loading: true });
     try {
       const res = await posService.cerrarCaja(monto);
-      set({ isRegisterOpen: false, loading: false });
-      if (res.estado === 'DESCUADRADO') {
-        toast.warning(`Caja cerrada con descuadre. Diferencia: $${res.diferencia}`);
+      set({ isRegisterOpen: false, pedidosActivos: [], loading: false });
+      if (res.turno.estado === 'CERRADO_CON_DESCUADRE') {
+        toast.info(`Caja cerrada con descuadre. Diferencia: $${res.turno.diferencia}`);
       } else {
-        toast.success("Caja cerrada cuadradamente");
+        toast.success("Caja cerrada exitosamente");
       }
-      return true;
+      return res;
     } catch (error: any) {
       toast.error(error?.response?.data?.error || "Error al cerrar caja");
       set({ loading: false });
-      return false;
+      return null;
     }
   }
 }));

@@ -34,8 +34,16 @@ export const posService = {
     return res.data;
   },
 
+  getPedidosActivos: async () => {
+    const res = await api.get(ENDPOINTS.POS_SERVICE.PEDIDOS.BASE, {
+      params: { estados: "EN_EDICION" }
+    });
+    return res.data;
+  },
+
   crearPedido: async (data: {
     cliente_nombre?: string;
+    cliente_apellido?: string;
     cliente_cedula?: string;
     items: Array<{
       productoId: string;
@@ -48,7 +56,17 @@ export const posService = {
     return res.data;
   },
 
-  actualizarPedido: async (id: string, data: { cliente_nombre?: string; cliente_cedula?: string }) => {
+  actualizarPedido: async (id: string, data: {
+    cliente_nombre?: string;
+    cliente_apellido?: string;
+    cliente_cedula?: string;
+    items?: Array<{
+      productoId: string;
+      nombre: string;
+      cantidad: number;
+      precioUnitario: number;
+    }>;
+  }) => {
     const res = await api.put(ENDPOINTS.POS_SERVICE.PEDIDOS.BY_ID(id), data);
     return res.data;
   },
@@ -58,12 +76,14 @@ export const posService = {
     return res.data;
   },
 
-  pagarPedido: async (id: string, data: { metodoPago: string; montoRecibido: number }) => {
+  pagarPedido: async (id: string, data: {
+    pagos: Array<{ metodoPago: string; monto: number; referencia_pago?: string }>;
+  }) => {
     const res = await api.post(ENDPOINTS.POS_SERVICE.PEDIDOS.PAGAR(id), data);
     return res.data;
   },
 
   getComprobanteUrl: (id: string) => {
-    return `${ENDPOINTS.POS_SERVICE.BASE_URL}/${ENDPOINTS.POS_SERVICE.PEDIDOS.COMPROBANTE(id)}`;
+    return `${ENDPOINTS.POS_SERVICE.BASE_URL}${ENDPOINTS.POS_SERVICE.PEDIDOS.COMPROBANTE(id)}`;
   }
 };
