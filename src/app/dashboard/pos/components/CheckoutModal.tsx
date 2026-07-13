@@ -38,7 +38,7 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
       return;
     }
     const restante = Math.round((total - sumaMontos) * 100) / 100;
-    setPagos([...pagos, { metodoPago, monto: restante > 0 ? restante : 0, referencia: "" }]);
+    setPagos([...pagos, { metodoPago, monto: restante > 0 ? restante : 0, referencia_pago: "" }]);
   };
 
   const updatePago = (index: number, field: string, value: any) => {
@@ -57,9 +57,9 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
       return;
     }
 
-    // Validate electronic methods have referencia (HU009-CA5)
+    // Validate electronic methods have referencia_pago (HU009-CA5)
     for (const pago of pagos) {
-      if (ELECTRONIC_METHODS.includes(pago.metodoPago) && !pago.referencia?.trim()) {
+      if (ELECTRONIC_METHODS.includes(pago.metodoPago) && !pago.referencia_pago?.trim()) {
         toast.error(`Debe registrar el número de comprobante para ${PAYMENT_METHODS.find(m => m.id === pago.metodoPago)?.name}`);
         return;
       }
@@ -161,8 +161,8 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
                         <label className="text-xs text-on-surface-variant">N° Comprobante</label>
                         <input
                           type="text"
-                          value={pago.referencia || ""}
-                          onChange={(e) => updatePago(index, "referencia", e.target.value)}
+                          value={pago.referencia_pago || ""}
+                          onChange={(e) => updatePago(index, "referencia_pago", e.target.value)}
                           placeholder="Obligatorio"
                           className="w-full p-2 text-sm rounded-lg border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none bg-surface"
                         />

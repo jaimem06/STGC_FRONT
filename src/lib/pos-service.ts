@@ -77,7 +77,7 @@ export const posService = {
   },
 
   pagarPedido: async (id: string, data: {
-    pagos: Array<{ metodoPago: string; monto: number; referencia?: string }>;
+    pagos: Array<{ metodoPago: string; monto: number; referencia_pago?: string }>;
   }) => {
     const res = await api.post(ENDPOINTS.POS_SERVICE.PEDIDOS.PAGAR(id), data);
     return res.data;

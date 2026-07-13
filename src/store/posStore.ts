@@ -21,7 +21,7 @@ export interface CartItem {
 export interface PagoInput {
   metodoPago: string;
   monto: number;
-  referencia?: string;
+  referencia_pago?: string;
 }
 
 export interface PedidoItem {
