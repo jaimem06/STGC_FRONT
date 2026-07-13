@@ -84,6 +84,7 @@ interface PosState {
   clearCart: () => void;
   setCliente: (nombre: string, apellido: string, cedula: string) => void;
   guardarPedido: () => Promise<boolean>;
+  cancelPedidoEnCobro: () => Promise<void>;
   loadPedidoForCheckout: (pedido: Pedido) => void;
   checkout: (pagos: PagoInput[]) => Promise<{ success: boolean; pedidoId?: string }>;
   abrirCaja: (monto: number) => Promise<boolean>;
@@ -243,7 +244,7 @@ export const usePosStore = create<PosState>((set, get) => ({
   },
 
   checkout: async (pagos) => {
-    const { cart, pedidoEnCobro, clienteNombre, clienteApellido, clienteCedula, clearCart, fetchProductos, fetchPedidosActivos } = get();
+    const { cart, pedidoEnCobro, clienteNombre, clienteApellido, clienteCedula, clearCart, fetchProductos } = get();
     if (cart.length === 0) return { success: false };
     if (pagos.length === 0) {
       toast.error("Debe registrar al menos un método de pago para continuar");
@@ -251,8 +252,8 @@ export const usePosStore = create<PosState>((set, get) => ({
     }
 
     set({ loading: true });
+    let pedidoId = pedidoEnCobro ?? "";
     try {
-      // If cobrando a partir de un pedido guardado, actualizar y pagar
       if (pedidoEnCobro) {
         await posService.actualizarPedido(pedidoEnCobro, {
           cliente_nombre: clienteNombre,
@@ -265,25 +266,23 @@ export const usePosStore = create<PosState>((set, get) => ({
             precioUnitario: i.precioUnitario
           }))
         });
-        await posService.pagarPedido(pedidoEnCobro, { pagos });
       } else {
-        const pedido = await posService.crearPedido({
+        const nuevo = await posService.crearPedido({
           cliente_nombre: clienteNombre,
           cliente_apellido: clienteApellido,
           cliente_cedula: clienteCedula,
           items: cart
         });
-        await posService.pagarPedido(pedido.id, { pagos });
+        pedidoId = nuevo.id;
       }
+      await posService.pagarPedido(pedidoId, { pagos });
 
       toast.success("Pago procesado con éxito");
       clearCart();
       set({ pedidoEnCobro: null });
       await fetchProductos();
-      await fetchPedidosActivos();
-      const resultId = pedidoEnCobro || pedido?.id;
       set({ loading: false });
-      return { success: true, pedidoId: resultId };
+      return { success: true, pedidoId };
     } catch (error: any) {
       toast.error(error?.response?.data?.error || "Error al procesar el pago");
       set({ loading: false });
