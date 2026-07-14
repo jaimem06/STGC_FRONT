@@ -202,7 +202,7 @@ const BaseInventarioItemObject = z.object({
   modulo: ModuloInventarioEnum,
   stock_minimo: z.number({ message: "El stock mínimo es obligatorio." })
     .min(0, "El stock mínimo no puede ser un número negativo.")
-    .max(30, "El stock mínimo no puede superar 30.")
+    .max(10000, "El stock mínimo no puede superar 10000.")
     .int("El stock mínimo debe ser un número entero."),
   codigo_trazabilidad: z.string().uuid().nullable().optional(),
   calidad: CalidadCafeEnum.nullable().optional(),
@@ -238,10 +238,18 @@ export const UpdateInventarioItemSchema = BaseInventarioItemObject.pick({
   stock_minimo: true,
   unidad_medida: true,
   descripcion: true,
+  fecha_caducidad: true,
+}).extend({
+  // HU019: motivo obligatorio solo cuando el precio cambia (se valida en el formulario).
+  motivo: z.string().max(250, "El motivo no puede superar 250 caracteres.").optional(),
 });
 
 export const UpdateEstadoSchema = z.object({
   estado: EstadoInventarioEnum,
+  // HU025: los cambios manuales de estado requieren justificación.
+  motivo: z.string({ message: "El motivo es obligatorio." })
+    .min(1, "El motivo del cambio de estado es obligatorio.")
+    .max(250, "El motivo no puede superar 250 caracteres."),
 });
 
 export const InventarioItemSchema = BaseInventarioItemObject.extend({
@@ -294,9 +302,7 @@ export const CreateMovimientoFacturaSchema = z.object({
     .refine(val => val <= 10000, "La cantidad no puede superar 10000."),
   unidad_medida: UnidadMedidaEnum,
   numero_factura: z.string({ message: "El número de factura es obligatorio." })
-    .min(1, "El número de factura es obligatorio.")
-    .length(17, "El número de factura debe tener exactamente 17 caracteres.")
-    .regex(/^[A-Za-z0-9]+$/, "El número de factura solo puede contener letras y números."),
+    .regex(/^\d{3}-\d{3}-\d{9}$/, "El formato de factura debe ser 000-000-000000000."),
   fecha_entrada: z.string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "El formato de fecha debe ser AAAA-MM-DD.")
     .optional(),
@@ -309,3 +315,58 @@ export const CreateMovimientoFacturaSchema = z.object({
 
 export type CreateMovimientoFacturaInput = z.infer<typeof CreateMovimientoFacturaSchema>;
 export type LoteCafe = z.infer<typeof LoteCafeSchema>;
+
+// --- HU021: movimiento contra el Inventory Service (no Billing) ---
+export const CreateMovimientoInventarioSchema = z.object({
+  item_id: z.string().uuid(),
+  cantidad: z.number({ message: "La cantidad es obligatoria." })
+    .refine(val => val > 0, "La cantidad debe ser mayor a 0.")
+    .refine(val => val <= 10000, "La cantidad no puede superar 10000."),
+  tipo: TipoMovimientoEnum,
+  motivo: z.string({ message: "El motivo es obligatorio." })
+    .min(1, "El motivo es obligatorio.")
+    .max(250, "El motivo no puede superar 250 caracteres."),
+  numero_factura: z.string({ message: "El número de factura es obligatorio." })
+    .min(1, "El número de factura es obligatorio.")
+    .regex(/^\d{3}-\d{3}-\d{9}$/, "El número de factura debe tener el formato 000-000-000000000."),
+  lote_id: z.string().uuid().nullable().optional(),
+});
+export type CreateMovimientoInventarioInput = z.infer<typeof CreateMovimientoInventarioSchema>;
+
+// --- HU019 / HU025 / HU028: tipos de respuesta de bitácoras y analítica ---
+export interface HistorialPrecio {
+  id: string;
+  item_id: string;
+  precio_anterior: number;
+  precio_nuevo: number;
+  motivo: string | null;
+  usuario_id: string | null;
+  fecha_cambio: string;
+}
+
+export interface HistorialEstado {
+  id: string;
+  item_id: string;
+  estado_anterior: EstadoInventario;
+  estado_nuevo: EstadoInventario;
+  motivo: string | null;
+  usuario_id: string | null;
+  fecha: string;
+}
+
+export interface AlertaStock {
+  item_id: string;
+  nombre: string;
+  cantidad_actual: number;
+  stock_minimo: number;
+  mensaje: string;
+}
+
+export interface StockStats {
+  total_items: number;
+  disponibles: number;
+  stock_bajo: number;
+  agotados: number;
+  valor_total: number;
+  num_lotes: number;
+}

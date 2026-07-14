@@ -1,78 +1,107 @@
 import { createInstance } from "./axios-config";
 import { ENDPOINTS } from "./endpoints";
-import { 
-  CreateInventarioItemInput, 
+import {
+  CreateInventarioItemInput,
   UpdateInventarioItemInput,
   UpdateEstadoInput,
-  InventarioItem, 
-  MovimientoStockInput,
+  InventarioItem,
+  CreateMovimientoInventarioInput,
+  HistorialPrecio,
+  HistorialEstado,
+  AlertaStock,
+  StockStats,
   LoteCafe,
-  FaseCafe
+  FaseCafe,
 } from "./schemas";
 
 export const inventoryInstance = createInstance(ENDPOINTS.INVENTORY.BASE_URL);
 
+const POS = ENDPOINTS.INVENTORY.POS;
+const TRACE = ENDPOINTS.INVENTORY.TRACEABILITY;
+
 export const inventoryApi = {
   // Gestión de Inventario (Cafetería / POS)
   listItems: () => {
-    return inventoryInstance.get<InventarioItem[]>("inventario/pos");
+    return inventoryInstance.get<InventarioItem[]>(POS.LIST);
   },
   createItem: (data: CreateInventarioItemInput) => {
-    return inventoryInstance.post<InventarioItem>("inventario/pos/nuevo", data);
+    return inventoryInstance.post<InventarioItem>(POS.CREATE, data);
   },
   updateItem: (id: string, data: UpdateInventarioItemInput) => {
-    return inventoryInstance.put<InventarioItem>(`inventario/pos/${id}`, data);
+    return inventoryInstance.put<InventarioItem>(POS.BY_ID(id), data);
   },
   updateStatus: (id: string, data: UpdateEstadoInput) => {
-    return inventoryInstance.patch<InventarioItem>(`inventario/pos/${id}/estado`, data);
+    return inventoryInstance.patch<InventarioItem>(POS.STATUS(id), data);
   },
   deleteItem: (id: string) => {
-    return inventoryInstance.delete(`inventario/pos/${id}`);
+    return inventoryInstance.delete(POS.BY_ID(id));
   },
   getItem: (id: string) => {
-    return inventoryInstance.get<InventarioItem>(`inventario/pos/${id}`);
+    return inventoryInstance.get<InventarioItem>(POS.BY_ID(id));
   },
-  
-  // Movimientos y Reportes
-  createMovement: (data: MovimientoStockInput) => {
-    return inventoryInstance.post("inventario/pos/movimientos", data);
+
+  // HU024: papelera (baja / restauración)
+  listDeleted: () => {
+    return inventoryInstance.get<InventarioItem[]>(POS.DELETED);
+  },
+  restoreItem: (id: string) => {
+    return inventoryInstance.patch<InventarioItem>(POS.RESTORE(id));
+  },
+
+  // HU028: analítica de inventario
+  listAlertasStock: () => {
+    return inventoryInstance.get<AlertaStock[]>(POS.ALERTAS_STOCK);
+  },
+  getStats: () => {
+    return inventoryInstance.get<StockStats>(POS.STATS);
+  },
+
+  // HU019 / HU025: bitácoras
+  listPriceHistory: (id: string) => {
+    return inventoryInstance.get<HistorialPrecio[]>(POS.PRICE_HISTORY(id));
+  },
+  listStatusHistory: (id: string) => {
+    return inventoryInstance.get<HistorialEstado[]>(POS.STATUS_HISTORY(id));
+  },
+
+  // HU021: movimientos contra el Inventory Service
+  createMovement: (data: CreateMovimientoInventarioInput) => {
+    return inventoryInstance.post(POS.MOVEMENTS, data);
   },
   listMovements: (id: string, start?: string, end?: string) => {
-    let url = `inventario/pos/${id}/movimientos`;
+    let url = POS.ITEM_MOVEMENTS(id);
     const params = new URLSearchParams();
     if (start) params.append("start_date", start);
     if (end) params.append("end_date", end);
     const query = params.toString();
     if (query) url += `?${query}`;
-    return inventoryInstance.get<any[]>(url);
+    return inventoryInstance.get<unknown[]>(url);
   },
-  // Re-implementación robusta para exportar con autenticación
+  // Exportar con autenticación (blob)
   exportGeneralMovements: async () => {
-    try {
-      const response = await inventoryInstance.get("inventario/pos/movimientos/exportar", {
-        responseType: 'blob',
-      });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `reporte_movimientos_pos_${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (error) {
-      console.error("Error al exportar:", error);
-      throw error;
-    }
+    const response = await inventoryInstance.get(POS.EXPORT, {
+      responseType: "blob",
+    });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute(
+      "download",
+      `reporte_movimientos_pos_${new Date().toISOString().split("T")[0]}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   },
 
-  // Gestión de Lotes y Trazabilidad (Finca)
+  // Gestión de Lotes y Trazabilidad (rutas del backend: /trazabilidad/...)
   listLots: () => {
-    return inventoryInstance.get<LoteCafe[]>("finca/lotes");
+    return inventoryInstance.get<LoteCafe[]>(TRACE.LOTS);
   },
   transitionLotPhase: (id: string, nextPhase: FaseCafe) => {
-    return inventoryInstance.post<LoteCafe>(`finca/lotes/${id}/transicion`, { fase: nextPhase });
+    return inventoryInstance.post<LoteCafe>(TRACE.TRANSITION(id), { fase: nextPhase });
   },
   getTraceabilityHistory: (code: string) => {
-    return inventoryInstance.get<any>(`trazabilidad/${code}`);
-  }
+    return inventoryInstance.get<LoteCafe[]>(TRACE.HISTORY(code));
+  },
 };
