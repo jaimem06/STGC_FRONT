@@ -59,7 +59,7 @@ const OPERACIONES_ACCESS = [
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
   [ROLES.ADMIN]: FULL_ACCESS,
   [ROLES.GERENTE_GENERAL]: FULL_ACCESS,
-  [ROLES.GERENTE_OPERACIONES]: OPERACIONES_ACCESS,
+  [ROLES.GERENTE_OPERACIONES]: FULL_ACCESS,
   
   // Habilitamos acceso a gestión de roles para el CAPATAZ
   [ROLES.CAPATAZ]: ["/dashboard", "/dashboard/roles"],
@@ -67,6 +67,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   [ROLES.GESTOR_INVENTARIO]: ["/dashboard", "/dashboard/inventory"],
   [ROLES.GESTOR_CALIDAD]: ["/dashboard", "/dashboard/traceability"],
   [ROLES.CAJERO_MESERO]: ["/dashboard", "/dashboard/pos"],
+  [ROLES.PERSONAL_COCINA]: ["/dashboard", "/dashboard/pos"],
 };
 
 /**
@@ -96,13 +97,17 @@ export function getDefaultRoute(roleName: string | undefined): string {
   
   const normalizedRole = normalizeRole(roleName);
   
-  if (normalizedRole === ROLES.GERENTE_OPERACIONES) return "/dashboard/users";
-  
-  if (normalizedRole === ROLES.ADMIN || normalizedRole === ROLES.GERENTE_GENERAL) return "/dashboard";
+  if (normalizedRole === ROLES.ADMIN || normalizedRole === ROLES.GERENTE_GENERAL || normalizedRole === ROLES.GERENTE_OPERACIONES) {
+    return "/dashboard";
+  }
   
   if (normalizedRole === ROLES.CAPATAZ) return "/dashboard/roles";
   
-  if (normalizedRole === ROLES.CAJERO_MESERO) return "/dashboard/pos";
+  if (normalizedRole === ROLES.CAJERO_MESERO || normalizedRole === ROLES.PERSONAL_COCINA) {
+    return "/dashboard/pos";
+  }
+
+  if (normalizedRole === ROLES.GESTOR_INVENTARIO) return "/dashboard/inventory";
 
   // Fallback: primera ruta permitida o login
   const firstAllowed = ROLE_PERMISSIONS[normalizedRole]?.[0];

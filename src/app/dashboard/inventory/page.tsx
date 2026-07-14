@@ -4,30 +4,41 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { inventoryApi } from "@/lib/inventory-service";
-import { billingApi } from "@/lib/billing-service";
+import { useInventoryStore } from "@/store/inventoryStore";
 import {
-  Package, Plus, ArrowUpRight, ArrowDownLeft, Tag, Layers, Info,
-  AlertTriangle, ClipboardList, Filter, BarChart3, Calendar,
-  DollarSign, Edit, Trash2, History, CheckCircle2, XCircle,
-  Download, Activity, FileSpreadsheet, LogIn, RefreshCw
+  Package, Plus, ArrowUpRight, Tag, Layers,
+  AlertTriangle, ClipboardList, BarChart3,
+  Edit, History, Archive, ArchiveRestore, Activity, DollarSign,
+  FileSpreadsheet, RefreshCw, EyeOff, Eye, MoreVertical
 } from "lucide-react";
 import {
   CreateInventarioItemSchema, CreateInventarioItemInput,
   UpdateInventarioItemSchema, UpdateInventarioItemInput,
   UpdateEstadoSchema, UpdateEstadoInput,
-  CreateMovimientoFacturaSchema, CreateMovimientoFacturaInput,
+  CreateMovimientoInventarioSchema, CreateMovimientoInventarioInput,
   InventarioItem, TipoElementoEnum, EstadoInventarioEnum, UnidadMedidaEnum,
-  EstadoInventario, ModuloInventarioEnum, CalidadCafeEnum, FaseCafeEnum
+  EstadoInventario,
 } from "@/lib/schemas";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import Table from "@/components/Table";
 import Input from "@/components/Input";
 import Select from "@/components/Select";
 import Dialog from "@/components/Dialog";
+import Confirm from "@/components/Confirm";
 import Search from "@/components/Search";
 import { toast } from "@/lib/notifications";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/DropdownMenu";
+import ProductFormFields from "./components/ProductFormFields";
+import PriceHistoryModal from "./components/PriceHistoryModal";
+import StatusHistoryModal from "./components/StatusHistoryModal";
 
-const statusStyles = {
+const statusStyles: Record<string, string> = {
   DISPONIBLE: "bg-green-50 text-green-700 border-green-200/50",
   AGOTADO: "bg-error-container/20 text-error border-error/20",
   STOCK_BAJO: "bg-amber-50 text-amber-700 border-amber-200/50",
@@ -43,60 +54,51 @@ const typeIcons = {
   CAFE_PROCESADO: Layers,
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const ProductFormFields = ({ register, errors, watch, setValue, isEdit = false }: any) => (
-  <div className="grid grid-cols-2 gap-4">
-    <div className="col-span-2">
-      <Input label="Nombre" required {...register("nombre")} error={errors.nombre?.message} />
-    </div>
-    {!isEdit && (
-      <Input label="SKU" required {...register("sku")} error={errors.sku?.message} />
-    )}
-    <Input label="Precio" type="number" step="0.01" required {...register("precio", { valueAsNumber: true })} error={errors.precio?.message} />
-    <Input label="Mínimo" type="number" step="1" required {...register("stock_minimo", { valueAsNumber: true })} error={errors.stock_minimo?.message} />
-    {!isEdit && (
-      <Select label="Categoría" required value={watch("tipo") || ""} options={TipoElementoEnum.options.map(t => ({ value: t, label: t.replace("_", " ") }))} onValueChange={(val) => setValue("tipo", val)} error={errors.tipo?.message} />
-    )}
-    <Select label="Unidad" required value={watch("unidad_medida") || ""} options={UnidadMedidaEnum.options.map(u => ({ value: u, label: u }))} onValueChange={(val) => setValue("unidad_medida", val)} error={errors.unidad_medida?.message} />
-    {!isEdit && (
-      <Select label="Estado" required value={watch("estado") || "DISPONIBLE"} options={EstadoInventarioEnum.options.map(e => ({ value: e, label: e.replace("_", " ") }))} onValueChange={(val) => setValue("estado", val)} error={errors.estado?.message} />
-    )}
-    {!isEdit && (
-      <>
-        <Input label="Cant. Inicial" type="number" step="0.01" {...register("cantidad_inicial", { valueAsNumber: true })} error={errors.cantidad_inicial?.message} />
-        <Input label="Fecha Caducidad" type="date" {...register("fecha_caducidad")} error={errors.fecha_caducidad?.message} />
-      </>
-    )}
-    <div className="col-span-2">
-      <label className="block font-label text-[9px] font-bold uppercase tracking-widest text-outline ml-1 mb-1">Descripción <span className="text-error">*</span></label>
-      <div className="relative">
-        <textarea className={`w-full bg-white border rounded-xl outline-none transition-all font-label text-sm font-bold shadow-sm placeholder:font-medium placeholder:text-outline/50 focus:ring-2 p-3 resize-none ${errors.descripcion ? "border-error focus:border-error focus:ring-error/10" : "border-outline-variant/20 focus:border-primary/30 focus:ring-primary/10"}`} rows={3} placeholder="Descripción del producto..." {...register("descripcion")} />
-        <div className="flex justify-between items-center mt-1">
-          {errors.descripcion ? <p className="text-[9px] font-bold text-error ml-1">{errors.descripcion.message}</p> : <span />}
-          <span className="text-[9px] font-bold text-outline mr-1">{(watch("descripcion") || "").length}/250</span>
-        </div>
-      </div>
-    </div>
-  </div>
-);
+/** HU025: estados que el usuario puede seleccionar según la matemática del inventario. */
+function estadosPermitidos(item: InventarioItem): EstadoInventario[] {
+  const caducado = !!item.fecha_caducidad && new Date(item.fecha_caducidad) <= new Date();
+  const permitidos: EstadoInventario[] = ["INACTIVO", "EN_TRANSITO", "BLOQUEADO"];
+  if (item.cantidad > item.stock_minimo && !caducado) permitidos.push("DISPONIBLE");
+  if (item.cantidad === 0) permitidos.push("AGOTADO");
+  if (item.cantidad > 0 && item.cantidad <= item.stock_minimo) permitidos.push("STOCK_BAJO");
+  if (caducado) permitidos.push("CADUCADO");
+  return permitidos;
+}
+
+interface ConfirmState {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmText: string;
+  variant: "danger" | "warning" | "success";
+  action: () => void;
+}
 
 export default function InventoryPage() {
-  const [items, setItems] = useState<InventarioItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { items, deletedItems, loading, fetchItems, fetchDeleted } = useInventoryStore();
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
+  const [showDeleted, setShowDeleted] = useState(false);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isPriceHistoryOpen, setIsPriceHistoryOpen] = useState(false);
+  const [isStatusHistoryOpen, setIsStatusHistoryOpen] = useState(false);
 
   const [selectedItem, setSelectedItem] = useState<InventarioItem | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [movements, setMovements] = useState<any[]>([]);
   const [historyDates, setHistoryDates] = useState({ start: "", end: "" });
+
+  const [confirmState, setConfirmState] = useState<ConfirmState>({
+    open: false, title: "", description: "", confirmText: "CONTINUAR", variant: "danger", action: () => {},
+  });
+  const closeConfirm = () => setConfirmState((s) => ({ ...s, open: false }));
 
   const { register: registerCreate, handleSubmit: handleSubmitCreate, reset: resetCreate, setValue: setCreateValue, watch: watchCreate, formState: { errors: errorsCreate } } = useForm<CreateInventarioItemInput>({
     resolver: zodResolver(CreateInventarioItemSchema),
@@ -107,32 +109,43 @@ export default function InventoryPage() {
     resolver: zodResolver(UpdateInventarioItemSchema)
   });
 
-  const { register: registerStatus, handleSubmit: handleSubmitStatus, setValue: setStatusValue, watch: watchStatus } = useForm<UpdateEstadoInput>({
+  const { handleSubmit: handleSubmitStatus, setValue: setStatusValue, watch: watchStatus, register: registerStatus, reset: resetStatus, formState: { errors: errorsStatus } } = useForm<UpdateEstadoInput>({
     resolver: zodResolver(UpdateEstadoSchema)
   });
 
-  const { register: registerMove, handleSubmit: handleSubmitMove, reset: resetMove, setValue: setMoveValue, watch: watchMove, formState: { errors: errorsMove } } = useForm<CreateMovimientoFacturaInput>({
-    resolver: zodResolver(CreateMovimientoFacturaSchema),
-    defaultValues: { tipo: "ENTRADA", cantidad: 0, numero_factura: "", fecha_entrada: new Date().toISOString().split('T')[0] }
+  const { register: registerMove, handleSubmit: handleSubmitMove, reset: resetMove, setValue: setMoveValue, watch: watchMove, formState: { errors: errorsMove } } = useForm<CreateMovimientoInventarioInput>({
+    resolver: zodResolver(CreateMovimientoInventarioSchema),
+    defaultValues: { tipo: "ENTRADA", cantidad: 0, motivo: "Entrada de inventario", numero_factura: "" }
   });
 
-  const selectedType = watchCreate("tipo");
-  const selectedUnit = watchCreate("unidad_medida");
   const moveType = watchMove("tipo");
+  const moveCantidad = watchMove("cantidad");
+  const [fac1, setFac1] = useState("");
+  const [fac2, setFac2] = useState("");
+  const [fac3, setFac3] = useState("");
 
+  useEffect(() => {
+    if (fac1 || fac2 || fac3) {
+      setMoveValue("numero_factura", `${fac1}-${fac2}-${fac3}`);
+    } else {
+      setMoveValue("numero_factura", "");
+    }
+  }, [fac1, fac2, fac3, setMoveValue]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleError = (err: any, context: string) => {
     console.error(`Error en ${context}:`, err);
     const status = err.response?.status;
     const backendMessage = err.response?.data?.message || err.response?.data?.detail;
 
     if (status === 409) {
-      toast.error("El SKU ingresado ya existe. Use un código único.");
+      toast.error(backendMessage || "Ya existe un registro con ese nombre. Use uno distinto.");
     } else if (status === 422) {
-      toast.error("Datos inválidos. Verifique el formato de fechas y campos.");
+      toast.error(backendMessage || "La operación no es válida según las reglas de negocio.");
     } else if (status === 401) {
       toast.error("Su sesión ha expirado.");
     } else if (status === 400) {
-      toast.error(backendMessage || "Solicitud incorrecta. Verifique el stock.");
+      toast.error(backendMessage || "Solicitud incorrecta. Verifique los datos.");
     } else if (backendMessage) {
       toast.error(backendMessage);
     } else {
@@ -140,123 +153,223 @@ export default function InventoryPage() {
     }
   };
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const refreshList = useCallback(async () => {
     try {
-      const res = await inventoryApi.listItems();
-      setItems(res.data);
-    } catch (err: any) {
+      if (showDeleted) await fetchDeleted();
+      else await fetchItems();
+    } catch (err) {
       handleError(err, "Carga de Inventario");
-    } finally {
-      setLoading(false);
     }
+  }, [showDeleted, fetchItems, fetchDeleted]);
+
+  useEffect(() => { refreshList(); }, [refreshList]);
+
+  // HU028: notificación proactiva de stock bajo al montar.
+  useEffect(() => {
+    inventoryApi.listAlertasStock()
+      .then((res) => {
+        if (res.data.length > 0) {
+          const agotados = res.data.filter((a) => a.mensaje === "Producto Agotado").length;
+          const caducados = res.data.filter((a) => a.mensaje === "Producto Caducado").length;
+          const bajoStock = res.data.filter((a) => a.mensaje === "Stock por debajo del mínimo").length;
+          
+          const msgs = [];
+          if (caducados > 0) msgs.push(`${caducados} caducado(s)`);
+          if (agotados > 0) msgs.push(`${agotados} agotado(s)`);
+          if (bajoStock > 0) msgs.push(`${bajoStock} con stock bajo`);
+          
+          toast.warning(`Tienes alertas: ${msgs.join(", ")}.`, undefined, "Revisar", "inventory-alert");
+        }
+      })
+      .catch(() => {});
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-
+  // HU028: métricas calculadas con la matemática viva (cantidad <= stock_minimo).
   const stats = useMemo(() => {
     const totalItems = items.length;
-    const lowStock = items.filter(i => i.estado === "STOCK_BAJO").length;
-    const outOfStock = items.filter(i => i.estado === "AGOTADO").length;
+    const lowStock = items.filter(i => i.cantidad > 0 && i.cantidad <= (i.stock_minimo ?? 0)).length;
+    const outOfStock = items.filter(i => i.cantidad <= 0).length;
     return { totalItems, lowStock, outOfStock };
   }, [items]);
 
   const handleCreateItem = async (data: CreateInventarioItemInput) => {
-    const cleanData = {
-      ...data,
-      fecha_caducidad: data.fecha_caducidad === "" ? null : data.fecha_caducidad,
-    };
+    const cleanData = { ...data, fecha_caducidad: data.fecha_caducidad === "" ? null : data.fecha_caducidad };
     setIsActionLoading(true);
     try {
       await inventoryApi.createItem(cleanData);
       toast.success("Producto/insumo registrado exitosamente.");
       setIsCreateModalOpen(false);
       resetCreate();
-      fetchData();
-    } catch (err: any) {
+      refreshList();
+    } catch (err) {
       handleError(err, "Registro de Producto");
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  const handleEditItem = async (data: UpdateInventarioItemInput) => {
+  const openEditModal = (item: InventarioItem) => {
+    setSelectedItem(item);
+    // HU023: rehidratar el formulario limpio con reset (no setValue en cadena).
+    resetEdit({
+      nombre: item.nombre,
+      precio: item.precio,
+      stock_minimo: item.stock_minimo,
+      unidad_medida: item.unidad_medida,
+      descripcion: item.descripcion || "",
+      fecha_caducidad: item.fecha_caducidad ? item.fecha_caducidad.split("T")[0] : "",
+      motivo: "",
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const doEditItem = async (data: UpdateInventarioItemInput) => {
     if (!selectedItem) return;
+    const cleanData = { ...data, fecha_caducidad: data.fecha_caducidad === "" ? null : data.fecha_caducidad };
     setIsActionLoading(true);
     try {
-      await inventoryApi.updateItem(selectedItem.id, data);
+      await inventoryApi.updateItem(selectedItem.id, cleanData);
       toast.success("Producto/insumo actualizado exitosamente.");
       setIsEditModalOpen(false);
-      fetchData();
-    } catch (err: any) {
+      refreshList();
+    } catch (err) {
       handleError(err, "Actualización de Producto");
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  const handleUpdateStatus = async (data: UpdateEstadoInput) => {
+  const handleEditItem = (data: UpdateInventarioItemInput) => {
+    if (!selectedItem) return;
+    const precioCambio = data.precio !== undefined && data.precio !== selectedItem.precio;
+    // HU019: exigir motivo cuando el precio cambia.
+    if (precioCambio && !data.motivo?.trim()) {
+      toast.error("Debe indicar el motivo del cambio de precio.");
+      return;
+    }
+    // HU023: confirmación previa a guardar.
+    const cambios: string[] = [];
+    if (data.nombre !== selectedItem.nombre) cambios.push("Nombre");
+    if (precioCambio) cambios.push("Precio");
+    if (data.stock_minimo !== selectedItem.stock_minimo) cambios.push("Stock mínimo");
+    if (data.descripcion !== (selectedItem.descripcion || "")) cambios.push("Descripción");
+    setConfirmState({
+      open: true,
+      title: "Confirmar cambios",
+      description: cambios.length ? `Vas a modificar: ${cambios.join(", ")}. ¿Continuar?` : "¿Guardar los cambios de este ítem?",
+      confirmText: "GUARDAR",
+      variant: "warning",
+      action: () => { closeConfirm(); doEditItem(data); },
+    });
+  };
+
+  const openStatusModal = (item: InventarioItem) => {
+    setSelectedItem(item);
+    resetStatus({ estado: item.estado, motivo: "" });
+    setIsStatusModalOpen(true);
+  };
+
+  const doUpdateStatus = async (data: UpdateEstadoInput) => {
     if (!selectedItem) return;
     setIsActionLoading(true);
     try {
       await inventoryApi.updateStatus(selectedItem.id, data);
-      toast.success("Estado actualizado");
+      toast.success("Estado actualizado.");
       setIsStatusModalOpen(false);
-      fetchData();
-    } catch (err: any) {
+      refreshList();
+    } catch (err) {
       handleError(err, "Cambio de Estado");
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  const handleDeleteItem = async (id: string) => {
-    if (!confirm("¿Eliminar producto?")) return;
+  const handleUpdateStatus = (data: UpdateEstadoInput) => {
+    setConfirmState({
+      open: true,
+      title: "Confirmar cambio de estado",
+      description: `Vas a cambiar el estado a ${data.estado.replace("_", " ")}. Motivo: ${data.motivo}. ¿Proceder?`,
+      confirmText: "CONFIRMAR",
+      variant: "warning",
+      action: () => { closeConfirm(); doUpdateStatus(data); },
+    });
+  };
+
+  const doDeleteItem = async (id: string) => {
     setIsActionLoading(true);
     try {
       await inventoryApi.deleteItem(id);
-      toast.success("Eliminado");
-      fetchData();
-    } catch (err: any) {
-      handleError(err, "Eliminación");
+      toast.success("Producto dado de baja.");
+      refreshList();
+    } catch (err) {
+      handleError(err, "Baja de producto");
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  const generateInvoiceNumber = (sku: string) => {
-    const cleanSku = sku.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-    const prefix = cleanSku.substring(0, 8);
-    const randomLength = 17 - prefix.length;
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let randomPart = '';
-    for (let i = 0; i < randomLength; i++) {
-      randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return prefix + randomPart;
+  // HU024: confirmación con Radix (no window.confirm).
+  const handleDeleteItem = (item: InventarioItem) => {
+    setConfirmState({
+      open: true,
+      title: "Dar de baja producto",
+      description: `El producto "${item.nombre}" se ocultará del inventario activo. Podrás restaurarlo desde "Ver de baja".`,
+      confirmText: "DAR DE BAJA",
+      variant: "danger",
+      action: () => { closeConfirm(); doDeleteItem(item.id); },
+    });
   };
 
-  const handleCreateMovement = async (data: CreateMovimientoFacturaInput) => {
+  const doRestoreItem = async (id: string) => {
     setIsActionLoading(true);
-    const cleanData = {
-      ...data,
-      fecha_caducidad: data.fecha_caducidad === "" ? undefined : data.fecha_caducidad
-    };
     try {
-      await billingApi.createMovimientoFactura(cleanData);
+      await inventoryApi.restoreItem(id);
+      toast.success("Producto restaurado.");
+      fetchDeleted().catch(() => {});
+    } catch (err) {
+      handleError(err, "Restauración");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleRestoreItem = (item: InventarioItem) => {
+    setConfirmState({
+      open: true,
+      title: "Restaurar producto",
+      description: `"${item.nombre}" volverá al inventario activo con su estado recalculado.`,
+      confirmText: "RESTAURAR",
+      variant: "success",
+      action: () => { closeConfirm(); doRestoreItem(item.id); },
+    });
+  };
+
+  const generateInvoiceNumber = () => {
+    setFac1(Math.floor(Math.random() * 999).toString().padStart(3, "0"));
+    setFac2(Math.floor(Math.random() * 999).toString().padStart(3, "0"));
+    setFac3(Math.floor(Math.random() * 999999999).toString().padStart(9, "0"));
+  };
+
+  const openMovementModal = (item: InventarioItem) => {
+    setSelectedItem(item);
+    setFac1("");
+    setFac2("");
+    setFac3("");
+    resetMove({ item_id: item.id, tipo: "ENTRADA", cantidad: 0, motivo: "Entrada de inventario", numero_factura: "" });
+    setIsMovementModalOpen(true);
+  };
+
+  // HU021: los movimientos van al Inventory Service (no a Billing).
+  const handleCreateMovement = async (data: CreateMovimientoInventarioInput) => {
+    setIsActionLoading(true);
+    try {
+      await inventoryApi.createMovement(data);
       toast.success(`${data.tipo === "ENTRADA" ? "Entrada" : "Salida"} registrada correctamente.`);
       setIsMovementModalOpen(false);
       resetMove();
-      fetchData();
-    } catch (err: any) {
-      const backendMessage = err.response?.data?.message || err.response?.data?.detail;
-      if (backendMessage === "La factura ya fue registrada anteriormente para este producto.") {
-        const newFactura = generateInvoiceNumber(selectedItem?.sku || "");
-        setMoveValue("numero_factura", newFactura);
-        toast.error("El documento ya existía y fue regenerado aleatoriamente. Confirma nuevamente.");
-      } else {
-        handleError(err, `Registro de ${data.tipo === "ENTRADA" ? "Entrada" : "Salida"}`);
-      }
+      refreshList();
+    } catch (err) {
+      handleError(err, `Registro de ${data.tipo === "ENTRADA" ? "Entrada" : "Salida"}`);
     } finally {
       setIsActionLoading(false);
     }
@@ -266,32 +379,35 @@ export default function InventoryPage() {
     setIsActionLoading(true);
     try {
       await inventoryApi.exportGeneralMovements();
-      toast.success("Reporte generado con éxito");
-    } catch (err: any) {
+      toast.success("Reporte generado con éxito.");
+    } catch (err) {
       handleError(err, "Exportación");
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     if (!selectedItem) return;
     try {
       const res = await inventoryApi.listMovements(selectedItem.id, historyDates.start, historyDates.end);
       setMovements(res.data);
-    } catch (err: any) {
-      toast.error("Error al obtener historial");
+    } catch {
+      toast.error("Error al obtener historial.");
     }
-  };
+  }, [selectedItem, historyDates]);
 
+  useEffect(() => { if (isHistoryModalOpen && selectedItem) fetchHistory(); }, [isHistoryModalOpen, selectedItem, historyDates, fetchHistory]);
+
+  const sourceItems = showDeleted ? deletedItems : items;
   const filteredItems = useMemo(() => {
-    return items.filter(i => {
+    return sourceItems.filter(i => {
       const matchesSearch = search === "" || i.nombre.toLowerCase().includes(search.toLowerCase()) || i.sku.toLowerCase().includes(search.toLowerCase());
       const matchesType = filterType === "ALL" || i.tipo === filterType;
       const matchesStatus = filterStatus === "ALL" || i.estado === filterStatus;
       return matchesSearch && matchesType && matchesStatus;
     });
-  }, [items, search, filterType, filterStatus]);
+  }, [sourceItems, search, filterType, filterStatus]);
 
   const columns = [
     {
@@ -313,7 +429,7 @@ export default function InventoryPage() {
       header: "Stock",
       accessor: (item: InventarioItem) => (
         <div className="flex flex-col">
-          <span className={`text-xs font-black ${item.cantidad <= (item.stock_minimo ?? 0) ? 'text-error' : 'text-primary'}`}>{item.cantidad.toLocaleString()}</span>
+          <span className={`text-xs font-black ${item.cantidad <= (item.stock_minimo ?? 0) ? "text-error" : "text-primary"}`}>{item.cantidad.toLocaleString()}</span>
           <span className="text-[9px] font-bold text-outline uppercase">{item.unidad_medida}</span>
         </div>
       ),
@@ -328,20 +444,58 @@ export default function InventoryPage() {
       header: "Acciones",
       align: "right" as const,
       accessor: (item: InventarioItem) => (
-        <div className="flex items-center justify-end gap-1">
-          <button onClick={() => { setSelectedItem(item); setMoveValue("item_id", item.id); setMoveValue("unidad_medida", item.unidad_medida as any); setMoveValue("numero_factura", ""); setIsMovementModalOpen(true); }} className="p-1.5 text-secondary hover:bg-secondary/10 rounded-lg" title="Movimiento"><ArrowUpRight size={16} /></button>
-          <button onClick={() => { setSelectedItem(item); setStatusValue("estado", item.estado); setIsStatusModalOpen(true); }} className="p-1.5 text-amber-600 hover:bg-amber-600/10 rounded-lg" title="Estado"><Activity size={16} /></button>
-          <button onClick={() => { setSelectedItem(item); setEditValue("nombre", item.nombre); setEditValue("precio", item.precio); setEditValue("stock_minimo", item.stock_minimo); setEditValue("unidad_medida", item.unidad_medida); setEditValue("descripcion", item.descripcion || ""); setIsEditModalOpen(true); }} className="p-1.5 text-tertiary hover:bg-tertiary/10 rounded-lg" title="Editar"><Edit size={16} /></button>
-          <button onClick={() => { setSelectedItem(item); setIsHistoryModalOpen(true); setHistoryDates({ start: "", end: "" }); }} className="p-1.5 text-primary hover:bg-primary/10 rounded-lg" title="Historial"><History size={16} /></button>
-          <button onClick={() => handleDeleteItem(item.id)} className="p-1.5 text-error hover:bg-error/10 rounded-lg" title="Eliminar"><Trash2 size={16} /></button>
-        </div>
+        showDeleted ? (
+          <div className="flex items-center justify-end gap-1">
+            <button onClick={() => handleRestoreItem(item)} className="flex items-center gap-1.5 px-3 py-1.5 text-secondary bg-secondary/5 hover:bg-secondary/10 rounded-lg text-[10px] font-black uppercase tracking-widest" title="Restaurar"><ArchiveRestore size={15} /> Restaurar</button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-end gap-1">
+            <button onClick={() => openMovementModal(item)} className="flex items-center gap-1.5 px-3 py-1.5 text-white bg-primary hover:bg-primary-container rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm" title="Nuevo Movimiento">
+              <ArrowUpRight size={14} /> Mover
+            </button>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="p-1.5 text-outline hover:bg-surface-container rounded-lg transition-colors outline-none focus:ring-2 focus:ring-primary/20" title="Más opciones">
+                  <MoreVertical size={16} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => openEditModal(item)}>
+                  <Edit size={14} className="mr-2 opacity-70" /> Editar información
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openStatusModal(item)}>
+                  <Activity size={14} className="mr-2 opacity-70" /> Cambiar estado
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => { setSelectedItem(item); setIsHistoryModalOpen(true); setHistoryDates({ start: "", end: "" }); }}>
+                  <History size={14} className="mr-2 opacity-70" /> Movimientos
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setSelectedItem(item); setIsPriceHistoryOpen(true); }}>
+                  <DollarSign size={14} className="mr-2 opacity-70" /> Bitácora de precios
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setSelectedItem(item); setIsStatusHistoryOpen(true); }}>
+                  <Layers size={14} className="mr-2 opacity-70" /> Bitácora de estados
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="danger" onClick={() => handleDeleteItem(item)}>
+                  <Archive size={14} className="mr-2 opacity-70" /> Dar de baja
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )
       ),
     },
   ];
 
-  useEffect(() => { if (isHistoryModalOpen && selectedItem) fetchHistory(); }, [isHistoryModalOpen, selectedItem, historyDates]);
+  if (loading && items.length === 0 && !showDeleted) return <LoadingSpinner size={52} fullPage />;
 
-  if (loading && items.length === 0) return <LoadingSpinner size={52} fullPage />;
+  const statusModalOptions = selectedItem
+    ? EstadoInventarioEnum.options
+        .filter((s) => estadosPermitidos(selectedItem).includes(s) || s === selectedItem.estado)
+        .map((s) => ({ value: s, label: s.replace("_", " ") }))
+    : [];
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4 animate-fade-in-up px-2 md:px-0">
@@ -353,6 +507,9 @@ export default function InventoryPage() {
           <p className="font-body text-[11px] text-outline uppercase tracking-[0.2em] font-bold">POS Management</p>
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={() => setShowDeleted((v) => !v)} className={`flex items-center gap-2 h-11 px-5 rounded-xl font-bold text-[11px] border transition-all shadow-sm ${showDeleted ? "bg-primary text-white border-transparent" : "bg-white text-primary border-outline-variant/30 hover:bg-surface-container"}`}>
+            {showDeleted ? <Eye size={18} /> : <EyeOff size={18} />} {showDeleted ? "VER TODOS" : "VER DE BAJA"}
+          </button>
           <button onClick={handleExportGeneralReport} className="flex items-center gap-2 h-11 px-5 bg-white text-primary rounded-xl font-bold text-[11px] border border-outline-variant/30 hover:bg-surface-container transition-all shadow-sm"><FileSpreadsheet size={18} /> EXPORTAR CSV</button>
           <button onClick={() => { resetCreate(); setIsCreateModalOpen(true); }} className="flex items-center gap-2 h-11 px-5 bg-primary text-white rounded-xl font-bold text-[11px] hover:bg-primary-container shadow-lg shadow-primary/20"><Plus size={18} /> NUEVO PRODUCTO</button>
         </div>
@@ -380,11 +537,12 @@ export default function InventoryPage() {
             <Select label="Categoría" value={filterType} onValueChange={setFilterType} options={[{ value: "ALL", label: "Todas" }, ...TipoElementoEnum.options.map(t => ({ value: t, label: t.replace("_", " ") }))]} />
             <Select label="Estado" value={filterStatus} onValueChange={setFilterStatus} options={[{ value: "ALL", label: "Todos" }, ...EstadoInventarioEnum.options.map(s => ({ value: s, label: s.replace("_", " ") }))]} />
           </div>
+          {showDeleted && <p className="text-[10px] font-bold text-outline uppercase tracking-widest bg-surface-container rounded-xl p-3">Mostrando productos dados de baja.</p>}
         </div>
         <div className="xl:col-span-3 bg-white rounded-[28px] border border-outline-variant/20 overflow-hidden shadow-sm min-h-[400px]"><Table data={filteredItems} columns={columns} rowKey={(i) => i.id} pageSize={10} /></div>
       </div>
 
-      {/* Modales actualizados */}
+      {/* Crear */}
       <Dialog isOpen={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} title="Crear Producto/Insumo">
         <form onSubmit={handleSubmitCreate(handleCreateItem)} className="space-y-4 pt-2">
           <ProductFormFields register={registerCreate} errors={errorsCreate} watch={watchCreate} setValue={setCreateValue} />
@@ -392,65 +550,135 @@ export default function InventoryPage() {
         </form>
       </Dialog>
 
+      {/* Editar */}
       <Dialog isOpen={isEditModalOpen} onOpenChange={setIsEditModalOpen} title="Editar Producto/Insumo">
         <form onSubmit={handleSubmitEdit(handleEditItem)} className="space-y-4 pt-2">
           <ProductFormFields register={registerEdit} errors={errorsEdit} watch={watchEdit} setValue={setEditValue} isEdit />
+          {selectedItem && watchEdit("precio") !== selectedItem.precio && (
+            <Input label="Motivo del cambio de precio" required {...registerEdit("motivo")} error={errorsEdit.motivo?.message} placeholder="Ej. Ajuste por proveedor" />
+          )}
           <button type="submit" className="w-full h-12 bg-tertiary text-white rounded-xl font-bold uppercase shadow-lg">ACTUALIZAR</button>
         </form>
       </Dialog>
 
-      <Dialog isOpen={isStatusModalOpen} onOpenChange={setIsStatusModalOpen} title="Actualizar Disponibilidad"><form onSubmit={handleSubmitStatus(handleUpdateStatus)} className="space-y-6 pt-2"><Select label="Nuevo Estado" required value={watchStatus("estado") || ""} options={EstadoInventarioEnum.options.map(s => ({ value: s, label: s.replace("_", " ") }))} onValueChange={(val) => setStatusValue("estado", val as EstadoInventario)} /><button type="submit" className="w-full h-12 bg-primary text-white rounded-xl font-bold uppercase shadow-lg">GUARDAR</button></form></Dialog>
+      {/* Estado */}
+      <Dialog isOpen={isStatusModalOpen} onOpenChange={setIsStatusModalOpen} title="Actualizar Disponibilidad">
+        <form onSubmit={handleSubmitStatus(handleUpdateStatus)} className="space-y-4 pt-2">
+          <Select label="Nuevo Estado" required value={watchStatus("estado") || ""} options={statusModalOptions} onValueChange={(val) => setStatusValue("estado", val as EstadoInventario)} />
+          <p className="text-[10px] font-bold text-outline">Solo se muestran los estados compatibles con el stock actual ({selectedItem?.cantidad ?? 0}).</p>
+          <Input label="Motivo" required {...registerStatus("motivo")} error={errorsStatus.motivo?.message} placeholder="Justificación del cambio" />
+          <button type="submit" className="w-full h-12 bg-primary text-white rounded-xl font-bold uppercase shadow-lg">GUARDAR</button>
+        </form>
+      </Dialog>
 
+      {/* Movimiento */}
       <Dialog isOpen={isMovementModalOpen} onOpenChange={setIsMovementModalOpen} title="Movimiento de Stock">
         <form onSubmit={handleSubmitMove(handleCreateMovement)} className="space-y-4 pt-2">
-          <div className="p-3 bg-surface-container rounded-xl border border-outline-variant/20 flex gap-3 items-center">
-            <div className="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center text-primary border border-outline-variant/10">
-              <Package size={20} />
+          <div className="p-3 bg-surface-container rounded-xl border border-outline-variant/20 flex justify-between items-center">
+            <div className="flex gap-3 items-center">
+              <div className="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center text-primary border border-outline-variant/10"><Package size={20} /></div>
+              <div>
+                <p className="text-[10px] font-black text-outline uppercase tracking-widest">{selectedItem?.sku}</p>
+                <p className="text-sm font-bold text-on-surface">{selectedItem?.nombre}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] font-black text-outline uppercase tracking-widest">{selectedItem?.sku}</p>
-              <p className="text-sm font-bold text-on-surface">{selectedItem?.nombre}</p>
+            <div className="text-right bg-white p-2 rounded-lg border border-outline-variant/10 shadow-sm">
+              <p className="text-[9px] font-black text-outline uppercase tracking-widest">Fecha</p>
+              <p className="text-xs font-bold text-primary">{new Date().toLocaleDateString("es-ES", { year: "numeric", month: "short", day: "numeric" })}</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 flex p-1 bg-surface-container-high rounded-xl">
-              <button type="button" onClick={() => setMoveValue("tipo", "ENTRADA")} className={`flex-1 py-3 rounded-lg font-black text-xs transition-all ${moveType === "ENTRADA" ? "bg-green-600 text-white shadow-md" : "text-outline hover:bg-white/50"}`}>ENTRADA</button>
-              <button type="button" onClick={() => setMoveValue("tipo", "SALIDA")} className={`flex-1 py-3 rounded-lg font-black text-xs transition-all ${moveType === "SALIDA" ? "bg-error text-white shadow-md" : "text-outline hover:bg-white/50"}`}>SALIDA</button>
+              <button type="button" onClick={() => { setMoveValue("tipo", "ENTRADA"); setMoveValue("motivo", "Entrada de inventario"); setFac1(""); setFac2(""); setFac3(""); setMoveValue("numero_factura", ""); }} className={`flex-1 py-3 rounded-lg font-black text-xs transition-all ${moveType === "ENTRADA" ? "bg-green-600 text-white shadow-md" : "text-outline hover:bg-white/50"}`}>ENTRADA</button>
+              <button type="button" onClick={() => { setMoveValue("tipo", "SALIDA"); setMoveValue("motivo", "Salida de inventario"); setFac1(""); setFac2(""); setFac3(""); setMoveValue("numero_factura", ""); }} className={`flex-1 py-3 rounded-lg font-black text-xs transition-all ${moveType === "SALIDA" ? "bg-error text-white shadow-md" : "text-outline hover:bg-white/50"}`}>SALIDA</button>
             </div>
             <Input label="Cantidad" type="number" step="0.01" required {...registerMove("cantidad", { valueAsNumber: true })} error={errorsMove.cantidad?.message} />
-            <Select label="Unidad" required value={watchMove("unidad_medida") || ""} options={UnidadMedidaEnum.options.map(u => ({ value: u, label: u }))} onValueChange={(val) => setMoveValue("unidad_medida", val as any)} error={errorsMove.unidad_medida?.message} />
+            <div className="flex flex-col justify-center">
+              <span className="block font-label text-[9px] font-bold uppercase tracking-widest text-outline ml-1 mb-1">Unidad</span>
+              <div className="px-4 py-2 bg-surface-container rounded-xl text-xs font-bold text-primary">{selectedItem?.unidad_medida}</div>
+            </div>
             <div className="col-span-2">
-              <Input 
-                label="Número de Factura / Doc" 
-                required 
-                {...registerMove("numero_factura")} 
-                error={errorsMove.numero_factura?.message} 
-                inputClassName="!pr-[85px] uppercase transition-colors" 
-                placeholder="Ingrese código..." 
-                rightElement={
-                  <button type="button" onClick={() => setMoveValue("numero_factura", generateInvoiceNumber(selectedItem?.sku || ""))} className="flex items-center gap-1.5 p-1 px-1.5 text-primary bg-primary/5 hover:bg-primary/10 border border-primary/10 rounded-lg transition-all opacity-80 hover:opacity-100" title="Generar código automático">
-                    <RefreshCw size={13} strokeWidth={2.5} />
-                    <span className="text-[9px] font-black uppercase tracking-widest">Generar</span>
+              <label className="block font-label text-[9px] font-bold uppercase tracking-widest text-outline ml-1 mb-1">
+                Número de Factura / Doc <span className="text-error">*</span>
+              </label>
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <input 
+                  placeholder="001" 
+                  maxLength={3}
+                  value={fac1}
+                  onChange={(e) => setFac1(e.target.value.replace(/\D/g, ""))}
+                  className="w-12 sm:w-14 px-1 sm:px-2 py-2 text-center bg-white border border-outline-variant/30 rounded-xl outline-none transition-all font-body text-xs shadow-sm focus:border-primary focus:ring-1 focus:ring-primary/30"
+                />
+                <span className="text-outline font-bold">-</span>
+                <input 
+                  placeholder="012" 
+                  maxLength={3}
+                  value={fac2}
+                  onChange={(e) => setFac2(e.target.value.replace(/\D/g, ""))}
+                  className="w-12 sm:w-14 px-1 sm:px-2 py-2 text-center bg-white border border-outline-variant/30 rounded-xl outline-none transition-all font-body text-xs shadow-sm focus:border-primary focus:ring-1 focus:ring-primary/30"
+                />
+                <span className="text-outline font-bold">-</span>
+                <input 
+                  placeholder="023384486" 
+                  maxLength={9}
+                  value={fac3}
+                  onChange={(e) => setFac3(e.target.value.replace(/\D/g, ""))}
+                  className="flex-1 min-w-[100px] px-2 sm:px-3 py-2 bg-white border border-outline-variant/30 rounded-xl outline-none transition-all font-body text-xs tracking-[0.1em] shadow-sm focus:border-primary focus:ring-1 focus:ring-primary/30"
+                />
+                {moveType === "SALIDA" && (
+                  <button type="button" onClick={generateInvoiceNumber} className="shrink-0 flex items-center gap-1.5 p-2 px-3 text-primary bg-primary/5 hover:bg-primary/10 border border-primary/10 rounded-lg transition-all" title="Generar código automático">
+                    <RefreshCw size={14} strokeWidth={2.5} />
+                    <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline-block">Generar</span>
                   </button>
-                }
-              />
+                )}
+              </div>
+              {errorsMove.numero_factura && <p className="text-error text-xs mt-1 ml-1">{errorsMove.numero_factura.message}</p>}
             </div>
             <div className="col-span-2">
-              <Input label="Fecha" type="date" required {...registerMove("fecha_entrada")} error={errorsMove.fecha_entrada?.message} />
+              <Input label="Motivo" required {...registerMove("motivo")} error={errorsMove.motivo?.message} />
             </div>
-            {moveType === "ENTRADA" && (
-              <div className="col-span-2">
-                <Input label="Fecha de Caducidad (Lote)" type="date" {...registerMove("fecha_caducidad")} error={errorsMove.fecha_caducidad?.message} />
-              </div>
-            )}
           </div>
+          {selectedItem && moveCantidad > 0 && (
+            <div className="p-3 bg-surface-container rounded-xl flex justify-between items-center">
+              <span className="text-[10px] font-black text-outline uppercase tracking-widest">Total estimado</span>
+              <span className="text-sm font-black text-primary">${(moveCantidad * selectedItem.precio).toFixed(2)}</span>
+            </div>
+          )}
           <button type="submit" className={`w-full h-12 text-white rounded-xl font-bold uppercase shadow-lg transition-all disabled:opacity-50 ${moveType === "ENTRADA" ? "bg-green-600 shadow-green-200" : "bg-error shadow-error/20"}`} disabled={isActionLoading}>
             {isActionLoading ? "Procesando..." : `Confirmar ${moveType}`}
           </button>
         </form>
       </Dialog>
 
-      <Dialog isOpen={isHistoryModalOpen} onOpenChange={setIsHistoryModalOpen} title="Historial de Movimientos"><div className="space-y-4"><div className="grid grid-cols-2 gap-2"><Input label="Desde" type="date" value={historyDates.start} onChange={(e) => setHistoryDates(prev => ({ ...prev, start: e.target.value }))} /><Input label="Hasta" type="date" value={historyDates.end} onChange={(e) => setHistoryDates(prev => ({ ...prev, end: e.target.value }))} /></div><div className="max-h-[300px] overflow-y-auto border border-outline-variant/20 rounded-2xl"><table className="w-full text-left"><thead className="sticky top-0 bg-surface-container-high"><tr className="border-b border-outline-variant/20"><th className="px-4 py-3 text-[10px] font-black uppercase">Fecha</th><th className="px-4 py-3 text-[10px] font-black uppercase text-center">Tipo</th><th className="px-4 py-3 text-[10px] font-black uppercase text-right">Cantidad</th></tr></thead><tbody>{movements.map((m) => (<tr key={m.id} className="border-b border-outline-variant/10 hover:bg-surface-container transition-colors"><td className="px-4 py-4 text-[11px] font-medium text-outline">{new Date(m.fecha).toLocaleString()}</td><td className="px-4 py-4 text-center"><div className={`inline-flex items-center gap-2 font-black text-[10px] px-2 py-1 rounded-lg ${m.tipo === 'ENTRADA' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-error'}`}>{m.tipo}</div><p className="text-[9px] text-outline mt-1 italic">{m.motivo}</p>{(m as any).numero_factura && <p className="text-[9px] text-primary font-bold mt-1">Factura: {(m as any).numero_factura}</p>}</td><td className="px-4 py-4 text-xs font-black text-primary text-right">{m.cantidad.toLocaleString()}</td></tr>))}</tbody></table>{movements.length === 0 && <div className="p-10 text-center text-[10px] font-bold text-outline uppercase tracking-widest">Sin registros encontrados</div>}</div></div></Dialog>
+      {/* Historial de movimientos */}
+      <Dialog isOpen={isHistoryModalOpen} onOpenChange={setIsHistoryModalOpen} title="Historial de Movimientos">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            <Input label="Desde" type="date" value={historyDates.start} onChange={(e) => setHistoryDates(prev => ({ ...prev, start: e.target.value }))} />
+            <Input label="Hasta" type="date" value={historyDates.end} onChange={(e) => setHistoryDates(prev => ({ ...prev, end: e.target.value }))} />
+          </div>
+          <div className="max-h-[300px] overflow-y-auto border border-outline-variant/20 rounded-2xl">
+            <table className="w-full text-left">
+              <thead className="sticky top-0 bg-surface-container-high"><tr className="border-b border-outline-variant/20"><th className="px-4 py-3 text-[10px] font-black uppercase">Fecha</th><th className="px-4 py-3 text-[10px] font-black uppercase text-center">Tipo</th><th className="px-4 py-3 text-[10px] font-black uppercase text-right">Cantidad</th></tr></thead>
+              <tbody>{movements.map((m) => (<tr key={m.id} className="border-b border-outline-variant/10 hover:bg-surface-container transition-colors"><td className="px-4 py-4 text-[11px] font-medium text-outline">{new Date(m.fecha).toLocaleString()}</td><td className="px-4 py-4 text-center"><div className={`inline-flex items-center gap-2 font-black text-[10px] px-2 py-1 rounded-lg ${m.tipo === "ENTRADA" ? "bg-green-50 text-green-600" : "bg-red-50 text-error"}`}>{m.tipo}</div><p className="text-[9px] text-outline mt-1 italic">{m.motivo}</p>{m.numero_factura && <p className="text-[9px] text-primary font-bold mt-1">Factura: {m.numero_factura}</p>}</td><td className="px-4 py-4 text-xs font-black text-primary text-right">{m.cantidad.toLocaleString()}</td></tr>))}</tbody>
+            </table>
+            {movements.length === 0 && <div className="p-10 text-center text-[10px] font-bold text-outline uppercase tracking-widest">Sin registros encontrados</div>}
+          </div>
+        </div>
+      </Dialog>
+
+      <PriceHistoryModal isOpen={isPriceHistoryOpen} onOpenChange={setIsPriceHistoryOpen} item={selectedItem} />
+      <StatusHistoryModal isOpen={isStatusHistoryOpen} onOpenChange={setIsStatusHistoryOpen} item={selectedItem} />
+
+      <Confirm
+        open={confirmState.open}
+        onOpenChange={(o) => setConfirmState((s) => ({ ...s, open: o }))}
+        title={confirmState.title}
+        description={confirmState.description}
+        confirmText={confirmState.confirmText}
+        variant={confirmState.variant}
+        onConfirm={confirmState.action}
+      />
     </div>
   );
 }

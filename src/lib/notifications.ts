@@ -21,8 +21,9 @@ export const toast = {
       },
     }),
 
-  warning: (message: string, description?: string, actionLabel: string = "Revisar") =>
+  warning: (message: string, description?: string, actionLabel: string = "Revisar", id?: string) =>
     sonnerToast.warning(message, {
+      id,
       description,
       duration: Infinity,
       action: {

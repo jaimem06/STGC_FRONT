@@ -36,6 +36,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
         )}
         <input
           ref={ref}
+          suppressHydrationWarning
           className={`w-full ${Icon ? "pl-10" : "px-4"} ${rightElement ? "pr-10" : "pr-4"} py-2 bg-white border rounded-xl outline-none transition-all font-body text-xs shadow-sm placeholder:text-outline-variant/60 ${
             error 
               ? "border-error focus:ring-2 focus:ring-error/10" 
