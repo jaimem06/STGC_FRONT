@@ -63,6 +63,8 @@ export default function RegisterModal({ type, onClose }: RegisterModalProps) {
   // Show result summary after close
   if (cierreResult) {
     const { turno, resumen } = cierreResult;
+    const money = (value: unknown) => (typeof value === "number" ? value : 0).toFixed(2);
+    const desglose: Record<string, number> = resumen?.desglose ?? {};
     return (
       <Dialog.Root open={true} onOpenChange={onClose}>
         <Dialog.Portal>
@@ -76,10 +78,11 @@ export default function RegisterModal({ type, onClose }: RegisterModalProps) {
                 Cierre de Caja
               </Dialog.Title>
             </div>
+            <Dialog.Description className="sr-only">Resumen del cierre de caja del turno actual.</Dialog.Description>
 
-            <div className={`p-3 rounded-xl mb-4 text-center ${turno.estado === 'CERRADO_CONCILIADO' ? 'bg-success/10 text-success' : 'bg-error/10 text-error'}`}>
+            <div className={`p-3 rounded-xl mb-4 text-center ${turno?.estado === 'CERRADO_CONCILIADO' ? 'bg-success/10 text-success' : 'bg-error/10 text-error'}`}>
               <span className="font-bold text-lg">
-                {turno.estado === 'CERRADO_CONCILIADO' ? '✓ Cerrado Conciliado' : '⚠ Cerrado con Descuadre'}
+                {turno?.estado === 'CERRADO_CONCILIADO' ? '✓ Cerrado Conciliado' : '⚠ Cerrado con Descuadre'}
               </span>
             </div>
 
@@ -88,30 +91,34 @@ export default function RegisterModal({ type, onClose }: RegisterModalProps) {
               <div className="bg-surface-container-low p-3 rounded-xl space-y-1.5">
                 <div className="flex justify-between">
                   <span className="text-on-surface-variant">Total Transacciones:</span>
-                  <span className="font-bold">{resumen.totalTransacciones}</span>
+                  <span className="font-bold">{resumen?.totalTransacciones ?? 0}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-on-surface-variant">Total Ventas:</span>
-                  <span className="font-bold">${resumen.montoVentasTotal.toFixed(2)}</span>
+                  <span className="font-bold">${money(resumen?.montoVentasTotal)}</span>
                 </div>
                 <div className="border-t border-outline-variant pt-1.5 mt-1.5">
                   <span className="text-xs font-semibold text-on-surface-variant block mb-1">Desglose por método:</span>
-                  {Object.entries(resumen.desglose).map(([metodo, monto]) => (
-                    <div key={metodo} className="flex justify-between text-xs">
-                      <span>{PAYMENT_LABELS[metodo] || metodo}</span>
-                      <span>${(monto as number).toFixed(2)}</span>
-                    </div>
-                  ))}
+                  {Object.keys(desglose).length === 0 ? (
+                    <p className="text-xs text-on-surface-variant italic">Sin movimientos registrados</p>
+                  ) : (
+                    Object.entries(desglose).map(([metodo, monto]) => (
+                      <div key={metodo} className="flex justify-between text-xs">
+                        <span>{PAYMENT_LABELS[metodo] || metodo}</span>
+                        <span>${money(monto)}</span>
+                      </div>
+                    ))
+                  )}
                 </div>
                 <div className="border-t border-outline-variant pt-1.5 mt-1.5">
                   <div className="flex justify-between">
                     <span className="text-on-surface-variant">Efectivo Físico:</span>
-                    <span className="font-bold">${turno.montoCierreFisico.toFixed(2)}</span>
+                    <span className="font-bold">${money(turno?.montoCierreFisico)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-on-surface-variant">Diferencia:</span>
-                    <span className={`font-bold ${turno.diferencia !== 0 ? 'text-error' : 'text-success'}`}>
-                      ${turno.diferencia.toFixed(2)}
+                    <span className={`font-bold ${(turno?.diferencia ?? 0) !== 0 ? 'text-error' : 'text-success'}`}>
+                      ${money(turno?.diferencia)}
                     </span>
                   </div>
                 </div>
@@ -149,12 +156,12 @@ export default function RegisterModal({ type, onClose }: RegisterModalProps) {
             )}
           </div>
 
-          <p className="text-sm text-on-surface-variant mb-6">
+          <Dialog.Description className="text-sm text-on-surface-variant mb-6">
             {type === "OPEN"
               ? "Ingresa el monto base en efectivo con el que inicias tu turno."
               : "Ingresa el monto total en efectivo que tienes físicamente en caja para realizar el cuadre."
             }
-          </p>
+          </Dialog.Description>
 
           <div className="mb-6">
             <label className="text-sm font-semibold text-on-surface-variant mb-2 block">

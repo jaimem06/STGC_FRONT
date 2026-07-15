@@ -81,7 +81,7 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
               <Receipt className="w-8 h-8 text-secondary" />
             </div>
             <Dialog.Title className="text-2xl font-display font-bold text-primary mb-2">¡Pago Exitoso!</Dialog.Title>
-            <p className="text-sm text-on-surface-variant mb-6 text-center">El comprobante fue generado con éxito</p>
+            <Dialog.Description className="text-sm text-on-surface-variant mb-6 text-center">El comprobante fue generado con éxito</Dialog.Description>
 
             <div className="flex gap-3 w-full">
               <a
@@ -120,6 +120,7 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
               <X className="w-6 h-6" />
             </Dialog.Close>
           </div>
+          <Dialog.Description className="sr-only">Registra uno o varios métodos de pago hasta cubrir el total del pedido.</Dialog.Description>
 
           <div className="bg-primary-container/10 border border-primary-container p-4 rounded-xl text-center mb-4">
             <span className="text-sm font-medium text-primary">Total a Cobrar</span>
