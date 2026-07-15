@@ -143,16 +143,17 @@ export default function Cart() {
           <button
             onClick={() => guardarPedido()}
             disabled={loading}
-            className="flex-1 py-3.5 rounded-xl border-2 border-outline-variant hover:bg-surface-container text-on-surface font-bold text-sm transition-all flex justify-center items-center gap-2"
+            className="flex-1 py-3.5 rounded-xl border-2 border-outline-variant hover:bg-surface-container text-on-surface font-bold text-sm transition-all flex justify-center items-center gap-2 disabled:opacity-50 active:scale-[0.98]"
           >
-            <ShoppingBag className="w-4 h-4" />
-            Guardar Pedido
+            <ShoppingBag className="w-4 h-4 shrink-0" />
+            <span className="truncate">Guardar</span>
           </button>
           <button
             onClick={() => setShowCheckout(true)}
-            className="flex-1 py-3.5 rounded-xl bg-secondary hover:bg-secondary-container hover:text-on-surface text-on-secondary font-bold text-lg transition-all shadow-md hover:shadow-lg flex justify-center items-center gap-2"
+            disabled={loading}
+            className="flex-[1.4] py-3.5 rounded-xl bg-secondary hover:bg-secondary-container hover:text-on-surface text-on-secondary font-bold text-base transition-all shadow-md hover:shadow-lg flex justify-center items-center gap-2 disabled:opacity-50 active:scale-[0.98]"
           >
-            <ShoppingBag className="w-5 h-5" />
+            <ShoppingBag className="w-5 h-5 shrink-0" />
             Cobrar
           </button>
         </div>

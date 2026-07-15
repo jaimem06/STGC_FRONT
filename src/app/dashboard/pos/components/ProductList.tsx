@@ -27,7 +27,7 @@ export default function ProductList() {
 
   if (productos.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full opacity-60">
+      <div className="flex flex-col items-center justify-center h-full min-h-[40vh] opacity-60">
         <PackageOpen className="w-16 h-16 mb-4 text-outline" />
         <p className="text-on-surface-variant font-medium">No hay productos disponibles</p>
       </div>
@@ -48,11 +48,11 @@ export default function ProductList() {
             className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none bg-surface"
           />
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2">
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="text-sm p-2 rounded-lg border border-outline-variant bg-surface outline-none"
+            className="flex-1 sm:flex-none text-sm p-2 rounded-lg border border-outline-variant bg-surface outline-none focus:border-primary transition-colors"
           >
             <option value="TODOS">Todos</option>
             <option value="DISPONIBLE">Disponible</option>
@@ -63,20 +63,20 @@ export default function ProductList() {
             placeholder="Stock min"
             value={minStock || ""}
             onChange={(e) => setMinStock(parseInt(e.target.value) || 0)}
-            className="w-24 text-sm p-2 rounded-lg border border-outline-variant bg-surface outline-none"
+            className="w-full flex-1 sm:flex-none sm:w-24 text-sm p-2 rounded-lg border border-outline-variant bg-surface outline-none focus:border-primary transition-colors"
           />
           <input
             type="number"
             placeholder="Stock max"
             value={maxStock === Infinity ? "" : maxStock}
             onChange={(e) => setMaxStock(e.target.value ? parseInt(e.target.value) : Infinity)}
-            className="w-24 text-sm p-2 rounded-lg border border-outline-variant bg-surface outline-none"
+            className="w-full flex-1 sm:flex-none sm:w-24 text-sm p-2 rounded-lg border border-outline-variant bg-surface outline-none focus:border-primary transition-colors"
           />
         </div>
       </div>
 
       {/* Product Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
         {filtered.map((product) => {
           const cartItem = cart.find(item => item.productoId === product.id);
           const inCartQuantity = cartItem?.cantidad || 0;
@@ -90,7 +90,7 @@ export default function ProductList() {
               className={`relative group bg-surface-container-lowest rounded-xl border p-3 flex flex-col cursor-pointer transition-all duration-200
                 ${isOutOfStock
                   ? 'border-error/30 opacity-60 cursor-not-allowed'
-                  : 'border-outline-variant hover:border-primary hover:shadow-md hover:-translate-y-1'}`}
+                  : 'border-outline-variant hover:border-primary hover:shadow-md hover:-translate-y-1 active:scale-[0.98]'}`}
             >
               {/* Status Badge (HU008-CA1) */}
               <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
@@ -124,7 +124,7 @@ export default function ProductList() {
               </div>
 
               {!isOutOfStock && (
-                <div className="absolute top-2 right-2 bg-primary text-on-primary p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-2 right-2 bg-primary text-on-primary p-1.5 rounded-full shadow-sm opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                   <Plus className="w-4 h-4" />
                 </div>
               )}
