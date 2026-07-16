@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePosStore } from "@/store/posStore";
-import { Minus, Plus, ShoppingBag, Trash2, User } from "lucide-react";
+import { Minus, Plus, ShoppingBag, Trash2, User, X, Check, ShoppingCart } from "lucide-react";
 import CheckoutModal from "./CheckoutModal";
 
 function roundCurrency(value: number): number {
@@ -12,130 +12,171 @@ function roundCurrency(value: number): number {
 const IVA_RATE = 0.15;
 
 export default function Cart() {
-  const { cart, removeFromCart, updateQuantity, clearCart, pedidoEnCobro, cancelPedidoEnCobro, clienteNombre, clienteApellido, clienteCedula, setCliente, guardarPedido, loading } = usePosStore();
+  const {
+    cart, removeFromCart, updateQuantity, clearCart, pedidoEnCobro, cancelPedidoEnCobro,
+    clienteNombre, clienteApellido, clienteCedula, setCliente, guardarPedido, loading,
+  } = usePosStore();
   const [isEditingClient, setIsEditingClient] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
 
   const subtotal = roundCurrency(cart.reduce((acc, item) => acc + item.precioUnitario * item.cantidad, 0));
   const iva = roundCurrency(subtotal * IVA_RATE);
   const total = roundCurrency(subtotal + iva);
+  const itemCount = cart.reduce((acc, item) => acc + item.cantidad, 0);
+  const clienteLabel = [clienteNombre, clienteApellido].filter(Boolean).join(" ") || "Consumidor Final";
 
   if (cart.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full opacity-60 p-6 text-center">
-        <ShoppingBag className="w-16 h-16 mb-4 text-outline" />
-        <h3 className="text-xl font-display font-bold text-on-surface mb-2">Carrito Vacío</h3>
-        <p className="text-on-surface-variant font-medium">Selecciona productos del menú para agregarlos al carrito.</p>
+      <div className="flex flex-col items-center justify-center h-full opacity-70 p-6 text-center bg-surface-container-lowest">
+        <div className="w-20 h-20 rounded-3xl bg-surface-container flex items-center justify-center mb-4">
+          <ShoppingCart className="w-9 h-9 text-outline" />
+        </div>
+        <h3 className="text-lg font-display font-bold text-on-surface mb-1">Carrito Vacío</h3>
+        <p className="text-sm text-on-surface-variant font-medium max-w-[220px]">Selecciona productos del menú para agregarlos al pedido.</p>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col h-full bg-surface-container-lowest">
-      {/* Client Section */}
-      <div className="p-4 border-b border-outline-variant bg-surface-container-low">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-bold text-primary flex items-center gap-2">
-            <User className="w-4 h-4" /> Cliente
-          </h3>
-          <button
-            onClick={() => setIsEditingClient(!isEditingClient)}
-            className="text-xs text-secondary font-medium hover:underline"
-          >
-            {isEditingClient ? "Cerrar" : "Editar"}
-          </button>
-        </div>
-
-        {isEditingClient ? (
-          <div className="space-y-2 mt-2">
+      {/* Cliente (compacto) */}
+      <div className="px-4 pt-4 pb-3 border-b border-outline-variant/50">
+        {!isEditingClient ? (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <User className="w-4 h-4 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-sm text-on-surface truncate leading-tight">{clienteLabel}</p>
+                <p className="text-[11px] text-on-surface-variant leading-tight">{clienteCedula}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsEditingClient(true)}
+              className="text-xs font-bold text-secondary hover:text-primary transition-colors shrink-0"
+            >
+              Editar
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5" /> Datos del cliente
+              </span>
+              <button
+                onClick={() => setIsEditingClient(false)}
+                className="flex items-center gap-1 text-xs font-bold text-secondary hover:text-primary transition-colors"
+              >
+                <Check className="w-3.5 h-3.5" /> Listo
+              </button>
+            </div>
             <input
               type="text"
               placeholder="Nombre"
-              className="w-full text-sm p-2 rounded border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+              className="w-full text-sm px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/50 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-colors"
               value={clienteNombre}
               onChange={(e) => setCliente(e.target.value, clienteApellido, clienteCedula)}
             />
-            <input
-              type="text"
-              placeholder="Apellidos"
-              className="w-full text-sm p-2 rounded border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-              value={clienteApellido}
-              onChange={(e) => setCliente(clienteNombre, e.target.value, clienteCedula)}
-            />
-            <input
-              type="text"
-              placeholder="Cédula / RUC"
-              className="w-full text-sm p-2 rounded border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-              value={clienteCedula}
-              onChange={(e) => setCliente(clienteNombre, clienteApellido, e.target.value)}
-            />
-          </div>
-        ) : (
-          <div className="bg-surface-container p-2 rounded-lg text-sm">
-            <p className="font-medium text-on-surface line-clamp-1">
-              {[clienteNombre, clienteApellido].filter(Boolean).join(" ") || "Consumidor Final"}
-            </p>
-            <p className="text-on-surface-variant text-xs">{clienteCedula}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                placeholder="Apellidos"
+                className="w-full text-sm px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/50 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-colors"
+                value={clienteApellido}
+                onChange={(e) => setCliente(clienteNombre, e.target.value, clienteCedula)}
+              />
+              <input
+                type="text"
+                placeholder="Cédula / RUC"
+                className="w-full text-sm px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/50 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-colors"
+                value={clienteCedula}
+                onChange={(e) => setCliente(clienteNombre, clienteApellido, e.target.value)}
+              />
+            </div>
           </div>
         )}
       </div>
 
-      {/* Header */}
-      <div className="flex justify-between items-center p-4 border-b border-outline-variant">
-        <h2 className="font-display font-bold text-lg text-on-surface">Pedido Actual</h2>
+      {/* Encabezado del pedido */}
+      <div className="flex items-center justify-between px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          <h2 className="font-display font-bold text-base text-on-surface">Pedido Actual</h2>
+          <span className="text-[11px] font-black text-on-secondary bg-secondary rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center">
+            {itemCount}
+          </span>
+        </div>
         <button
           onClick={pedidoEnCobro ? cancelPedidoEnCobro : clearCart}
-          className="text-error hover:bg-error-container p-2 rounded-lg transition-colors"
-          title={pedidoEnCobro ? "Cancelar pedido" : "Vaciar Carrito"}
+          className="text-outline hover:text-error hover:bg-error-container/40 p-1.5 rounded-lg transition-colors"
+          title={pedidoEnCobro ? "Cancelar pedido" : "Vaciar carrito"}
         >
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Items */}
-      <div className="flex-1 overflow-auto p-4 space-y-3">
+      {/* Items (filas compactas, más espacio de scroll) */}
+      <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-2 custom-scrollbar">
         {cart.map((item) => (
-          <div key={item.productoId} className="flex flex-col gap-2 bg-surface p-3 rounded-xl border border-outline-variant shadow-sm">
-            <div className="flex justify-between items-start">
-              <h4 className="font-semibold text-on-surface text-sm line-clamp-2 pr-2">{item.nombre}</h4>
-              <span className="font-bold text-primary">${roundCurrency(item.precioUnitario * item.cantidad).toFixed(2)}</span>
+          <div
+            key={item.productoId}
+            className="group flex items-center gap-2 bg-surface-container-lowest border border-outline-variant/40 rounded-2xl pl-3 pr-2 py-2 hover:border-primary/30 hover:shadow-sm transition-all"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm text-on-surface truncate leading-tight">{item.nombre}</p>
+              <p className="text-[11px] text-on-surface-variant font-medium leading-tight">
+                ${item.precioUnitario.toFixed(2)} c/u
+              </p>
             </div>
-            <div className="flex justify-between items-center mt-1">
-              <span className="text-xs text-on-surface-variant font-medium">${item.precioUnitario.toFixed(2)} c/u</span>
-              <div className="flex items-center gap-3 bg-surface-container rounded-lg p-1">
-                <button
-                  onClick={() => updateQuantity(item.productoId, item.cantidad - 1)}
-                  className="w-6 h-6 flex items-center justify-center rounded bg-surface hover:bg-outline-variant transition-colors text-on-surface"
-                >
-                  <Minus className="w-3 h-3" />
-                </button>
-                <span className="text-sm font-bold w-4 text-center">{item.cantidad}</span>
-                <button
-                  onClick={() => updateQuantity(item.productoId, item.cantidad + 1)}
-                  className="w-6 h-6 flex items-center justify-center rounded bg-surface hover:bg-outline-variant transition-colors text-on-surface"
-                >
-                  <Plus className="w-3 h-3" />
-                </button>
-              </div>
+
+            <div className="flex items-center gap-1 bg-surface-container rounded-full p-0.5 shrink-0">
+              <button
+                onClick={() => updateQuantity(item.productoId, item.cantidad - 1)}
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-surface text-on-surface hover:bg-primary hover:text-on-primary transition-colors active:scale-90"
+                aria-label="Disminuir"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+              <span className="w-6 text-center text-sm font-bold text-primary tabular-nums">{item.cantidad}</span>
+              <button
+                onClick={() => updateQuantity(item.productoId, item.cantidad + 1)}
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-surface text-on-surface hover:bg-primary hover:text-on-primary transition-colors active:scale-90"
+                aria-label="Aumentar"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
             </div>
+
+            <span className="w-16 text-right font-bold text-primary text-sm tabular-nums shrink-0">
+              ${roundCurrency(item.precioUnitario * item.cantidad).toFixed(2)}
+            </span>
+
+            <button
+              onClick={() => removeFromCart(item.productoId)}
+              className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-outline hover:text-error hover:bg-error-container/50 transition-colors"
+              title="Quitar producto"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
         ))}
       </div>
 
-      {/* Totals & Checkout */}
-      <div className="p-4 bg-surface border-t border-outline-variant shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <div className="space-y-2 mb-4 text-sm font-medium">
+      {/* Totales y acciones */}
+      <div className="p-4 bg-surface border-t border-outline-variant/60 shadow-[0_-6px_16px_-8px_rgba(31,27,20,0.12)]">
+        <div className="space-y-1.5 mb-3.5 text-sm">
           <div className="flex justify-between text-on-surface-variant">
             <span>Subtotal</span>
-            <span>${subtotal.toFixed(2)}</span>
+            <span className="tabular-nums font-medium">${subtotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-on-surface-variant">
             <span>IVA (15%)</span>
-            <span>${iva.toFixed(2)}</span>
+            <span className="tabular-nums font-medium">${iva.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-lg font-display font-bold text-primary pt-2 border-t border-outline-variant">
-            <span>Total</span>
-            <span>${total.toFixed(2)}</span>
+          <div className="flex justify-between items-center pt-2 border-t border-outline-variant/50">
+            <span className="font-display font-bold text-base text-on-surface">Total</span>
+            <span className="font-display font-black text-xl text-primary tabular-nums">${total.toFixed(2)}</span>
           </div>
         </div>
 
@@ -143,7 +184,7 @@ export default function Cart() {
           <button
             onClick={() => guardarPedido()}
             disabled={loading}
-            className="flex-1 py-3.5 rounded-xl border-2 border-outline-variant hover:bg-surface-container text-on-surface font-bold text-sm transition-all flex justify-center items-center gap-2 disabled:opacity-50 active:scale-[0.98]"
+            className="flex-1 py-3.5 rounded-2xl border-2 border-outline-variant/70 hover:bg-surface-container text-on-surface font-bold text-sm transition-all flex justify-center items-center gap-2 disabled:opacity-50 active:scale-[0.98]"
           >
             <ShoppingBag className="w-4 h-4 shrink-0" />
             <span className="truncate">Guardar</span>
@@ -151,10 +192,10 @@ export default function Cart() {
           <button
             onClick={() => setShowCheckout(true)}
             disabled={loading}
-            className="flex-[1.4] py-3.5 rounded-xl bg-secondary hover:bg-secondary-container hover:text-on-surface text-on-secondary font-bold text-base transition-all shadow-md hover:shadow-lg flex justify-center items-center gap-2 disabled:opacity-50 active:scale-[0.98]"
+            className="flex-[1.5] py-3.5 rounded-2xl bg-secondary hover:bg-secondary/90 text-on-secondary font-bold text-base transition-all shadow-md shadow-secondary/20 hover:shadow-lg hover:shadow-secondary/25 flex justify-center items-center gap-2 disabled:opacity-50 active:scale-[0.98]"
           >
-            <ShoppingBag className="w-5 h-5 shrink-0" />
-            Cobrar
+            <ShoppingCart className="w-5 h-5 shrink-0" />
+            Cobrar ${total.toFixed(2)}
           </button>
         </div>
       </div>

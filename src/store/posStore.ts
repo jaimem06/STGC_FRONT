@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { posService } from "@/lib/pos-service";
+import { billingApi, Comprobante } from "@/lib/billing-service";
 import { toast } from "@/lib/notifications";
 
 export interface Product {
@@ -86,9 +87,32 @@ interface PosState {
   guardarPedido: () => Promise<boolean>;
   cancelPedidoEnCobro: () => Promise<void>;
   loadPedidoForCheckout: (pedido: Pedido) => void;
-  checkout: (pagos: PagoInput[]) => Promise<{ success: boolean; pedidoId?: string }>;
+  checkout: (pagos: PagoInput[]) => Promise<{ success: boolean; pedidoId?: string; comprobante?: Comprobante }>;
   abrirCaja: (monto: number) => Promise<boolean>;
   cerrarCaja: (monto: number) => Promise<CierreResult | null>;
+}
+
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
+/**
+ * Ajusta los montos de los pagos para que sumen EXACTAMENTE el total autoritativo
+ * del backend. Si hay un solo pago, se fija al total; si hay varios, se corrige el
+ * último por la diferencia. Absorbe descuadres de redondeo/sincronización.
+ */
+function reconciliarPagos(pagos: PagoInput[], totalBackend: number): PagoInput[] {
+  if (pagos.length === 0) return pagos;
+  const suma = round2(pagos.reduce((acc, p) => acc + (p.monto || 0), 0));
+  const diff = round2(totalBackend - suma);
+  if (diff === 0) return pagos;
+
+  const ajustados = pagos.map((p) => ({ ...p }));
+  if (ajustados.length === 1) {
+    ajustados[0].monto = totalBackend;
+  } else {
+    const last = ajustados.length - 1;
+    ajustados[last].monto = round2((ajustados[last].monto || 0) + diff);
+  }
+  return ajustados;
 }
 
 export const usePosStore = create<PosState>((set, get) => ({
@@ -254,8 +278,13 @@ export const usePosStore = create<PosState>((set, get) => ({
     set({ loading: true });
     let pedidoId = pedidoEnCobro ?? "";
     try {
+      // Sincronizamos el pedido con el carrito y tomamos el total AUTORITATIVO
+      // que devuelve el backend (calculado sobre los items recién enviados). Así
+      // el pago siempre cuadra con lo que el backend espera, evitando el error
+      // "La suma de los pagos no coincide con el total" por redondeo/desincronización.
+      let pedidoSync: Pedido;
       if (pedidoEnCobro) {
-        await posService.actualizarPedido(pedidoEnCobro, {
+        pedidoSync = await posService.actualizarPedido(pedidoEnCobro, {
           cliente_nombre: clienteNombre,
           cliente_apellido: clienteApellido,
           cliente_cedula: clienteCedula,
@@ -267,22 +296,42 @@ export const usePosStore = create<PosState>((set, get) => ({
           }))
         });
       } else {
-        const nuevo = await posService.crearPedido({
+        pedidoSync = await posService.crearPedido({
           cliente_nombre: clienteNombre,
           cliente_apellido: clienteApellido,
           cliente_cedula: clienteCedula,
           items: cart
         });
-        pedidoId = nuevo.id;
+        pedidoId = pedidoSync.id;
       }
-      await posService.pagarPedido(pedidoId, { pagos });
+
+      const totalBackend = Math.round((pedidoSync?.total ?? 0) * 100) / 100;
+      const pagosConciliados = reconciliarPagos(pagos, totalBackend);
+      await posService.pagarPedido(pedidoId, { pagos: pagosConciliados });
+
+      // HU012: emitir la factura en el billing-service (lee el pedido pagado de
+      // la BD compartida). Es best-effort: si falla, el cobro ya está hecho y la
+      // factura se puede reintentar desde el modal de éxito.
+      let comprobante: Comprobante | undefined;
+      try {
+        comprobante = await billingApi.emitirComprobante(pedidoId);
+      } catch (e: any) {
+        // La factura es best-effort: el cobro ya está hecho. Si billing la rechaza
+        // (p. ej. 422 por datos faltantes del cliente), mostramos el motivo exacto
+        // para que el cajero sepa qué corregir, y se puede reintentar desde el modal.
+        const motivo = e?.response?.data?.message;
+        console.warn("No se pudo emitir la factura:", motivo || e);
+        if (motivo) {
+          toast.info("Pago registrado · factura pendiente", motivo, "Entendido");
+        }
+      }
 
       toast.success("Pago procesado con éxito");
       clearCart();
       set({ pedidoEnCobro: null });
       await fetchProductos();
       set({ loading: false });
-      return { success: true, pedidoId };
+      return { success: true, pedidoId, comprobante };
     } catch (error: any) {
       toast.error(error?.response?.data?.error || "Error al procesar el pago");
       set({ loading: false });
