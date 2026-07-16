@@ -14,8 +14,8 @@ interface CheckoutModalProps {
 
 const PAYMENT_METHODS = [
   { id: "EFECTIVO", name: "Efectivo", icon: Banknote },
-  { id: "TARJETA_CREDITO", name: "Tarjeta Crédito", icon: CreditCard },
-  { id: "TARJETA_DEBITO", name: "Tarjeta Débito", icon: CreditCard },
+  { id: "TARJETA_CREDITO", name: "Tarjeta de Crédito", icon: CreditCard },
+  { id: "TARJETA_DEBITO", name: "Tarjeta de Débito", icon: CreditCard },
   { id: "TRANSFERENCIA", name: "Transferencia", icon: Landmark },
   { id: "DE_UNA", name: "De Una", icon: Smartphone },
   { id: "AHORITA", name: "Ahorita", icon: Wallet },
@@ -52,10 +52,10 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
   };
 
   const handleCheckout = async () => {
-    if (!isComplete) {
-      toast.error("La suma de los montos debe coincidir exactamente con el total");
-      return;
-    }
+      if (!isComplete) {
+        toast.error("La suma de los montos debe coincidir exactamente con el total");
+        return;
+      }
 
     // Validate electronic methods have referencia_pago (HU009-CA5)
     for (const pago of pagos) {
@@ -109,6 +109,13 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
   const usedMethods = pagos.map(p => p.metodoPago);
   const availableMethods = PAYMENT_METHODS.filter(m => !usedMethods.includes(m.id));
 
+  function formatComprobante(value: string): string {
+    const digits = value.replace(/\D/g, '').slice(0, 13);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
   return (
     <Dialog.Root open={true} onOpenChange={onClose}>
       <Dialog.Portal>
@@ -159,12 +166,12 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
                     </div>
                     {isElectronic && (
                       <div className="flex-[2]">
-                        <label className="text-xs text-on-surface-variant">N° Comprobante</label>
+                        <label className="text-xs text-on-surface-variant">N° Comprobante <span className="text-error">*</span></label>
                         <input
                           type="text"
                           value={pago.referencia_pago || ""}
-                          onChange={(e) => updatePago(index, "referencia_pago", e.target.value)}
-                          placeholder="Obligatorio"
+                          onChange={(e) => updatePago(index, "referencia_pago", formatComprobante(e.target.value))}
+                          placeholder="xxx-xxx-xxxxxxx"
                           className="w-full p-2 text-sm rounded-lg border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none bg-surface"
                         />
                       </div>

@@ -13,8 +13,8 @@ interface RegisterModalProps {
 
 const PAYMENT_LABELS: Record<string, string> = {
   EFECTIVO: "Efectivo",
-  TARJETA_CREDITO: "Tarjeta Crédito",
-  TARJETA_DEBITO: "Tarjeta Débito",
+  TARJETA_CREDITO: "Tarjeta de Crédito",
+  TARJETA_DEBITO: "Tarjeta de Débito",
   TRANSFERENCIA: "Transferencia",
   DE_UNA: "De Una",
   AHORITA: "Ahorita"
