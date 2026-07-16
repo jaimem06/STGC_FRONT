@@ -9,6 +9,13 @@ export const ENDPOINTS = {
       process.env.NEXT_PUBLIC_BILLING_SERVICE_URL,
       "http://localhost:3002/api/"
     ),
+    MOVIMIENTO: "billing/facturas/movimiento",
+    COMPROBANTES: {
+      // Emite (o recupera) la factura de un pedido pagado.
+      EMITIR: (pedidoId: string) => `billing/comprobantes/${pedidoId}/emitir`,
+      // Descarga el PDF de la factura bajo demanda.
+      PDF: (pedidoId: string) => `billing/comprobantes/${pedidoId}/pdf`,
+    },
   },
   AUTH: {
     BASE_URL: normalizeBaseUrl(
