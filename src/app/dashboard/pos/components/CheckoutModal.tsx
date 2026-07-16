@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { usePosStore, PagoInput } from "@/store/posStore";
-import { CreditCard, Banknote, Landmark, X, Receipt, Wallet, Smartphone, FileText, Loader2, Plus, Sparkles } from "lucide-react";
-import { billingApi, abrirFacturaPdf, Comprobante } from "@/lib/billing-service";
-import { toast } from "@/lib/notifications";
+import { usePosStore, PagoInput, validarClienteFactura } from "@/store/posStore";
+import {
+  CreditCard, Banknote, Landmark, X, Receipt, Wallet, Smartphone,
+  FileText, Loader2, Plus, Sparkles, Download, AlertTriangle, CheckCircle2, UserRound,
+} from "lucide-react";
+import {
+  billingApi, crearUrlFacturaPdf, descargarBlobComoArchivo, extraerMotivoBilling, Comprobante,
+} from "@/lib/billing-service";
+import ClienteFactura from "./ClienteFactura";
 
 interface CheckoutModalProps {
   total: number;
@@ -25,13 +30,31 @@ const ELECTRONIC_METHODS = ["TRANSFERENCIA", "TARJETA_CREDITO", "TARJETA_DEBITO"
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+interface SuccessData {
+  pedidoId: string;
+  comprobante?: Comprobante;
+  clienteResumen: string;
+  facturaError?: string;
+}
+
 export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
-  const { checkout, loading } = usePosStore();
+  const { checkout, loading, facturaConDatos } = usePosStore();
   const [pagos, setPagos] = useState<PagoInput[]>([{ metodoPago: "EFECTIVO", monto: total }]);
-  const [successData, setSuccessData] = useState<{ pedidoId?: string; comprobante?: Comprobante } | null>(null);
+  const [successData, setSuccessData] = useState<SuccessData | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [clienteErrors, setClienteErrors] = useState<Record<string, string>>({});
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const pdfUrlRef = useRef<string | null>(null);
+
+  // La URL de blob del PDF se revoca al cerrar el visor o desmontar el modal.
+  useEffect(() => {
+    pdfUrlRef.current = pdfUrl;
+  }, [pdfUrl]);
+  useEffect(() => () => {
+    if (pdfUrlRef.current) window.URL.revokeObjectURL(pdfUrlRef.current);
+  }, []);
 
   const sumaMontos = round2(pagos.reduce((acc, p) => acc + (p.monto || 0), 0));
   const diferencia = round2(total - sumaMontos);
@@ -62,10 +85,7 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
   };
 
   const addPago = (metodoPago: string) => {
-    if (pagos.some((p) => p.metodoPago === metodoPago)) {
-      toast.warning("Ese método de pago ya está agregado");
-      return;
-    }
+    if (pagos.some((p) => p.metodoPago === metodoPago)) return;
     // El nuevo método absorbe automáticamente el resto pendiente.
     const restante = round2(total - sumaMontos);
     const next = [...pagos, { metodoPago, monto: restante > 0 ? restante : 0, referencia_pago: "" }];
@@ -121,7 +141,8 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
     commit(restantes);
   };
 
-  const handleCheckout = async (metodoPago: string) => {
+  const handleCheckout = async () => {
+    // Al confirmar se validan TODOS los campos, tocados o no.
     const allTouched: Record<string, boolean> = {};
     pagos.forEach((p) => {
       allTouched[`monto_${p.metodoPago}`] = true;
@@ -133,34 +154,61 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
       setFieldErrors(errs);
       return;
     }
-    if (!isComplete) {
-      toast.error("La suma de los montos debe coincidir exactamente con el total");
-      return;
+    if (!isComplete) return;
+
+    // Con factura con datos, el cliente debe estar completo ANTES de cobrar
+    // (el billing-service rechaza facturas con datos incompletos).
+    const { clienteNombre, clienteApellido, clienteCedula } = usePosStore.getState();
+    if (facturaConDatos) {
+      const cErrs = validarClienteFactura(clienteNombre, clienteApellido, clienteCedula);
+      if (Object.keys(cErrs).length > 0) {
+        setClienteErrors(cErrs);
+        return;
+      }
     }
+    // El store limpia el cliente tras cobrar: capturamos el resumen antes.
+    const clienteResumen = facturaConDatos
+      ? `${clienteNombre} ${clienteApellido} · ${clienteCedula}`.trim()
+      : "Consumidor Final";
+
     const result = await checkout(pagos);
-    if (result.success) setSuccessData(result);
-    
-    const restante = round2(total - sumaMontos);
-    commit([...pagos, { metodoPago, monto: restante > 0 ? restante : 0, referencia_pago: "" }]);
+    if (result.success && result.pedidoId) {
+      setSuccessData({
+        pedidoId: result.pedidoId,
+        comprobante: result.comprobante,
+        clienteResumen,
+        facturaError: result.facturaError,
+      });
+    }
   };
 
-  const handleFactura = async () => {
-    if (!successData?.pedidoId) return;
+  /** Emite la factura si hace falta y abre el visor embebido con el PDF. */
+  const handleVerFactura = async () => {
+    if (!successData) return;
     setDownloadingPdf(true);
     try {
-      if (!successData.comprobante) {
-        const comprobante = await billingApi.emitirComprobante(successData.pedidoId);
-        setSuccessData((prev) => (prev ? { ...prev, comprobante } : prev));
+      let comprobante = successData.comprobante;
+      if (!comprobante) {
+        comprobante = await billingApi.emitirComprobante(successData.pedidoId);
       }
-      await abrirFacturaPdf(successData.pedidoId);
-    } catch {
-      toast.error(
-        "No se pudo generar la factura",
-        "El pago sí se registró. Revisa la conexión con el servicio de facturación e inténtalo de nuevo."
-      );
+      const url = await crearUrlFacturaPdf(successData.pedidoId);
+      if (pdfUrlRef.current) window.URL.revokeObjectURL(pdfUrlRef.current);
+      setSuccessData({ ...successData, comprobante, facturaError: undefined });
+      setPdfUrl(url);
+    } catch (e) {
+      const motivo = await extraerMotivoBilling(e);
+      setSuccessData({
+        ...successData,
+        facturaError: motivo || "No se pudo generar la factura. Revisa la conexión con el servicio de facturación e inténtalo de nuevo.",
+      });
     } finally {
       setDownloadingPdf(false);
     }
+  };
+
+  const cerrarVisor = () => {
+    if (pdfUrlRef.current) window.URL.revokeObjectURL(pdfUrlRef.current);
+    setPdfUrl(null);
   };
 
   function formatComprobante(value: string): string {
@@ -170,30 +218,92 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
     return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
   }
 
+  // ── Visor de factura embebido (sin popups: el PDF se muestra en la web) ──
+  if (successData && pdfUrl) {
+    const numero = successData.comprobante?.numero_comprobante ?? successData.pedidoId;
+    return (
+      <Dialog.Root open={true} onOpenChange={cerrarVisor}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-xl z-50 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-3xl h-[88vh] bg-surface rounded-3xl shadow-[0_12px_48px_rgba(31,27,20,0.35)] ring-1 ring-black/[0.04] z-50 flex flex-col overflow-hidden animate-slide-up">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-outline-variant/40 shrink-0">
+              <Dialog.Title className="flex items-center gap-2 text-base font-display font-bold text-primary">
+                <FileText className="w-[18px] h-[18px]" /> Factura {numero}
+              </Dialog.Title>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => descargarBlobComoArchivo(pdfUrl, `factura-${numero}.pdf`)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-secondary text-on-secondary hover:bg-secondary/90 transition-colors active:scale-95"
+                >
+                  <Download className="w-3.5 h-3.5" /> Descargar
+                </button>
+                <button
+                  onClick={cerrarVisor}
+                  className="w-8 h-8 flex items-center justify-center rounded-full text-outline hover:text-error hover:bg-error-container/40 transition-colors"
+                  aria-label="Cerrar visor"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <Dialog.Description className="sr-only">Vista previa del PDF de la factura emitida.</Dialog.Description>
+            <iframe src={pdfUrl} title={`Factura ${numero}`} className="flex-1 w-full bg-surface-container" />
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    );
+  }
+
+  // ── Pago exitoso: detalle de la factura + acciones ──
   if (successData) {
+    const { comprobante, facturaError, clienteResumen } = successData;
     return (
       <Dialog.Root open={true} onOpenChange={onClose}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-xl z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+          <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-xl z-50 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
           <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-sm bg-surface rounded-3xl shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] z-50 p-7 flex flex-col items-center animate-slide-up">
             <div className="w-16 h-16 bg-secondary-container rounded-full flex items-center justify-center mb-4 shadow-inner">
-              <Receipt className="w-8 h-8 text-secondary" />
+              <CheckCircle2 className="w-8 h-8 text-secondary" />
             </div>
-            <Dialog.Title className="text-2xl font-display font-bold text-primary mb-2">¡Pago Exitoso!</Dialog.Title>
-            <Dialog.Description className="text-sm text-on-surface-variant mb-6 text-center">
-              {successData.comprobante
-                ? `Factura ${successData.comprobante.numero_comprobante} generada con éxito`
-                : "El pago se registró correctamente"}
+            <Dialog.Title className="text-2xl font-display font-bold text-primary mb-1">¡Pago Exitoso!</Dialog.Title>
+            <Dialog.Description className="text-sm text-on-surface-variant mb-5 text-center">
+              El cobro quedó registrado correctamente.
             </Dialog.Description>
+
+            {/* Detalle de la factura */}
+            {comprobante ? (
+              <div className="w-full rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-4 mb-5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Factura</span>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-secondary-container text-secondary uppercase">
+                    {comprobante.estado_factura}
+                  </span>
+                </div>
+                <p className="font-display font-black text-xl text-primary tabular-nums">{comprobante.numero_comprobante}</p>
+                <p className="flex items-center gap-1.5 text-xs font-medium text-on-surface-variant">
+                  <UserRound className="w-3.5 h-3.5 shrink-0" /> {clienteResumen}
+                </p>
+              </div>
+            ) : (
+              <div className="w-full rounded-2xl border border-tertiary/40 bg-tertiary/10 p-4 mb-5">
+                <p className="flex items-start gap-2 text-xs font-semibold text-tertiary">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  Factura pendiente de emitir
+                </p>
+                {facturaError && (
+                  <p className="text-[11px] font-medium text-on-surface-variant mt-1.5 leading-relaxed">{facturaError}</p>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-3 w-full">
               <button
-                onClick={handleFactura}
+                onClick={handleVerFactura}
                 disabled={downloadingPdf}
                 className="flex-1 border-2 border-outline-variant/70 hover:bg-surface-container text-on-surface py-3 rounded-2xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.98]"
               >
                 {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                {successData.comprobante ? "Ver Factura" : "Generar Factura"}
+                {downloadingPdf ? "Generando..." : comprobante ? "Ver Factura" : "Reintentar Factura"}
               </button>
               <button
                 onClick={onClose}
@@ -223,7 +333,7 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
               <X className="w-5 h-5" />
             </Dialog.Close>
           </div>
-          <Dialog.Description className="sr-only">Registra uno o varios métodos de pago hasta cubrir el total del pedido.</Dialog.Description>
+          <Dialog.Description className="sr-only">Registra el tipo de factura y uno o varios métodos de pago hasta cubrir el total del pedido.</Dialog.Description>
 
           {/* Total + progreso de cobertura */}
           <div className="px-6 shrink-0">
@@ -247,8 +357,15 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
             </div>
           </div>
 
-          {/* Lista de pagos (scroll flexible) */}
+          {/* Cliente + lista de pagos (scroll flexible) */}
           <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-2.5">
+            {/* Tipo de factura */}
+            <div className="rounded-2xl bg-surface-container-low border border-outline-variant/40 p-3">
+              <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Facturar a</p>
+              <ClienteFactura errors={clienteErrors} onChange={() => setClienteErrors({})} />
+            </div>
+
+            <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider pt-1">Métodos de pago</p>
             {pagos.map((pago, index) => {
               const method = PAYMENT_METHODS.find((m) => m.id === pago.metodoPago)!;
               const Icon = method.icon;

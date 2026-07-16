@@ -75,6 +75,7 @@ interface PosState {
   clienteNombre: string;
   clienteApellido: string;
   clienteCedula: string;
+  facturaConDatos: boolean;
   isRegisterOpen: boolean;
   loading: boolean;
   fetchProductos: () => Promise<void>;
@@ -84,12 +85,41 @@ interface PosState {
   updateQuantity: (productoId: string, cantidad: number) => void;
   clearCart: () => void;
   setCliente: (nombre: string, apellido: string, cedula: string) => void;
+  setFacturaConDatos: (conDatos: boolean) => void;
   guardarPedido: () => Promise<boolean>;
   cancelPedidoEnCobro: () => Promise<void>;
   loadPedidoForCheckout: (pedido: Pedido) => void;
-  checkout: (pagos: PagoInput[]) => Promise<{ success: boolean; pedidoId?: string; comprobante?: Comprobante }>;
+  checkout: (pagos: PagoInput[]) => Promise<{ success: boolean; pedidoId?: string; comprobante?: Comprobante; facturaError?: string }>;
   abrirCaja: (monto: number) => Promise<boolean>;
   cerrarCaja: (monto: number) => Promise<CierreResult | null>;
+}
+
+/** Datos del cliente por defecto para ventas a consumidor final. */
+export const CONSUMIDOR_FINAL = {
+  nombre: "Consumidor Final",
+  apellido: "",
+  cedula: "9999999999",
+} as const;
+
+/** True si la cédula es la genérica de consumidor final (solo nueves). */
+export const esCedulaConsumidorFinal = (cedula: string) =>
+  cedula.trim() === "" || /^9+$/.test(cedula.trim());
+
+/**
+ * Valida los datos del cliente cuando la venta pide factura con datos.
+ * Devuelve un mapa campo → mensaje (vacío si todo es válido).
+ */
+export function validarClienteFactura(nombre: string, apellido: string, cedula: string): Record<string, string> {
+  const errs: Record<string, string> = {};
+  if (!nombre.trim()) errs.nombre = "Ingresa el nombre del cliente";
+  if (!apellido.trim()) errs.apellido = "Ingresa el apellido del cliente";
+  const ced = cedula.trim();
+  if (!/^\d{10}$/.test(ced) && !/^\d{13}$/.test(ced)) {
+    errs.cedula = "Cédula de 10 dígitos o RUC de 13 dígitos";
+  } else if (esCedulaConsumidorFinal(ced)) {
+    errs.cedula = "Usa una identificación real (no la de consumidor final)";
+  }
+  return errs;
 }
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
@@ -120,9 +150,10 @@ export const usePosStore = create<PosState>((set, get) => ({
   cart: [],
   pedidosActivos: [],
   pedidoEnCobro: null,
-  clienteNombre: "Consumidor Final",
-  clienteApellido: "",
-  clienteCedula: "9999999999",
+  clienteNombre: CONSUMIDOR_FINAL.nombre,
+  clienteApellido: CONSUMIDOR_FINAL.apellido,
+  clienteCedula: CONSUMIDOR_FINAL.cedula,
+  facturaConDatos: false,
   isRegisterOpen: false,
   loading: false,
 
@@ -210,7 +241,13 @@ export const usePosStore = create<PosState>((set, get) => ({
     });
   },
 
-  clearCart: () => set({ cart: [], clienteNombre: "Consumidor Final", clienteApellido: "", clienteCedula: "9999999999" }),
+  clearCart: () => set({
+    cart: [],
+    clienteNombre: CONSUMIDOR_FINAL.nombre,
+    clienteApellido: CONSUMIDOR_FINAL.apellido,
+    clienteCedula: CONSUMIDOR_FINAL.cedula,
+    facturaConDatos: false,
+  }),
 
   cancelPedidoEnCobro: async () => {
     const { pedidoEnCobro } = get();
@@ -221,11 +258,32 @@ export const usePosStore = create<PosState>((set, get) => ({
     } catch (e: any) {
       toast.error(e?.response?.data?.error || "Error al cancelar pedido");
     }
-    set({ cart: [], pedidoEnCobro: null, clienteNombre: "Consumidor Final", clienteApellido: "", clienteCedula: "9999999999" });
+    set({
+      cart: [],
+      pedidoEnCobro: null,
+      clienteNombre: CONSUMIDOR_FINAL.nombre,
+      clienteApellido: CONSUMIDOR_FINAL.apellido,
+      clienteCedula: CONSUMIDOR_FINAL.cedula,
+      facturaConDatos: false,
+    });
     await get().fetchPedidosActivos();
   },
 
   setCliente: (nombre, apellido, cedula) => set({ clienteNombre: nombre, clienteApellido: apellido, clienteCedula: cedula }),
+
+  setFacturaConDatos: (conDatos) => {
+    if (conDatos) {
+      // Se limpian los campos para que el cajero escriba los datos reales.
+      set({ facturaConDatos: true, clienteNombre: "", clienteApellido: "", clienteCedula: "" });
+    } else {
+      set({
+        facturaConDatos: false,
+        clienteNombre: CONSUMIDOR_FINAL.nombre,
+        clienteApellido: CONSUMIDOR_FINAL.apellido,
+        clienteCedula: CONSUMIDOR_FINAL.cedula,
+      });
+    }
+  },
 
   guardarPedido: async () => {
     const { cart, clienteNombre, clienteApellido, clienteCedula, clearCart, fetchPedidosActivos } = get();
@@ -258,21 +316,34 @@ export const usePosStore = create<PosState>((set, get) => ({
       precioUnitario: i.precioUnitario,
       cantidad: i.cantidad
     }));
+    // El pedido guardado define el modo: cédula real → factura con datos.
+    const conDatos = !esCedulaConsumidorFinal(pedido.cliente_cedula || "");
     set({
       cart,
       pedidoEnCobro: pedido.id,
-      clienteNombre: pedido.cliente_nombre || "Consumidor Final",
-      clienteApellido: pedido.cliente_apellido || "",
-      clienteCedula: pedido.cliente_cedula || "9999999999"
+      facturaConDatos: conDatos,
+      clienteNombre: pedido.cliente_nombre || CONSUMIDOR_FINAL.nombre,
+      clienteApellido: pedido.cliente_apellido || CONSUMIDOR_FINAL.apellido,
+      clienteCedula: pedido.cliente_cedula || CONSUMIDOR_FINAL.cedula,
     });
   },
 
   checkout: async (pagos) => {
-    const { cart, pedidoEnCobro, clienteNombre, clienteApellido, clienteCedula, clearCart, fetchProductos } = get();
+    const { cart, pedidoEnCobro, clienteNombre, clienteApellido, clienteCedula, facturaConDatos, clearCart, fetchProductos } = get();
     if (cart.length === 0) return { success: false };
     if (pagos.length === 0) {
       toast.error("Debe registrar al menos un método de pago para continuar");
       return { success: false };
+    }
+    // Respaldo de la validación de la UI: con factura con datos no se cobra
+    // hasta tener cliente completo (evita el 422 del billing-service).
+    if (facturaConDatos) {
+      const errs = validarClienteFactura(clienteNombre, clienteApellido, clienteCedula);
+      const primero = Object.values(errs)[0];
+      if (primero) {
+        toast.error("Completa los datos de facturación", primero);
+        return { success: false };
+      }
     }
 
     set({ loading: true });
@@ -313,17 +384,15 @@ export const usePosStore = create<PosState>((set, get) => ({
       // la BD compartida). Es best-effort: si falla, el cobro ya está hecho y la
       // factura se puede reintentar desde el modal de éxito.
       let comprobante: Comprobante | undefined;
+      let facturaError: string | undefined;
       try {
         comprobante = await billingApi.emitirComprobante(pedidoId);
       } catch (e: any) {
-        // La factura es best-effort: el cobro ya está hecho. Si billing la rechaza
-        // (p. ej. 422 por datos faltantes del cliente), mostramos el motivo exacto
-        // para que el cajero sepa qué corregir, y se puede reintentar desde el modal.
-        const motivo = e?.response?.data?.message;
-        console.warn("No se pudo emitir la factura:", motivo || e);
-        if (motivo) {
-          toast.info("Pago registrado · factura pendiente", motivo, "Entendido");
-        }
+        // El cobro ya está hecho: guardamos el motivo exacto del rechazo para
+        // mostrarlo en el modal de éxito, donde se puede reintentar.
+        facturaError = e?.response?.data?.message
+          || "No se pudo conectar con el servicio de facturación. Puedes reintentar desde este panel.";
+        console.warn("No se pudo emitir la factura:", facturaError, e);
       }
 
       toast.success("Pago procesado con éxito");
@@ -331,7 +400,7 @@ export const usePosStore = create<PosState>((set, get) => ({
       set({ pedidoEnCobro: null });
       await fetchProductos();
       set({ loading: false });
-      return { success: true, pedidoId, comprobante };
+      return { success: true, pedidoId, comprobante, facturaError };
     } catch (error: any) {
       toast.error(error?.response?.data?.error || "Error al procesar el pago");
       set({ loading: false });

@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { usePosStore } from "@/store/posStore";
-import { Minus, Plus, ShoppingBag, Trash2, User, X, Check, ShoppingCart } from "lucide-react";
+import { Minus, Plus, ShoppingBag, Trash2, User, X, Check, ShoppingCart, FileText } from "lucide-react";
 import CheckoutModal from "./CheckoutModal";
+import ClienteFactura from "./ClienteFactura";
 
 function roundCurrency(value: number): number {
   return Math.round(value * 100) / 100;
@@ -14,7 +15,7 @@ const IVA_RATE = 0.15;
 export default function Cart() {
   const {
     cart, removeFromCart, updateQuantity, clearCart, pedidoEnCobro, cancelPedidoEnCobro,
-    clienteNombre, clienteApellido, clienteCedula, setCliente, guardarPedido, loading,
+    clienteNombre, clienteApellido, clienteCedula, facturaConDatos, guardarPedido, loading,
   } = usePosStore();
   const [isEditingClient, setIsEditingClient] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -23,7 +24,7 @@ export default function Cart() {
   const iva = roundCurrency(subtotal * IVA_RATE);
   const total = roundCurrency(subtotal + iva);
   const itemCount = cart.reduce((acc, item) => acc + item.cantidad, 0);
-  const clienteLabel = [clienteNombre, clienteApellido].filter(Boolean).join(" ") || "Consumidor Final";
+  const clienteLabel = [clienteNombre, clienteApellido].filter(Boolean).join(" ").trim() || "Consumidor Final";
 
   if (cart.length === 0) {
     return (
@@ -45,11 +46,13 @@ export default function Cart() {
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <User className="w-4 h-4 text-primary" />
+                {facturaConDatos ? <FileText className="w-4 h-4 text-primary" /> : <User className="w-4 h-4 text-primary" />}
               </div>
               <div className="min-w-0">
                 <p className="font-bold text-sm text-on-surface truncate leading-tight">{clienteLabel}</p>
-                <p className="text-[11px] text-on-surface-variant leading-tight">{clienteCedula}</p>
+                <p className="text-[11px] text-on-surface-variant leading-tight">
+                  {facturaConDatos ? clienteCedula || "Cédula pendiente" : "Factura sin datos"}
+                </p>
               </div>
             </div>
             <button
@@ -63,7 +66,7 @@ export default function Cart() {
           <div className="space-y-2 animate-fade-in">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-primary flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5" /> Datos del cliente
+                <User className="w-3.5 h-3.5" /> Facturar a
               </span>
               <button
                 onClick={() => setIsEditingClient(false)}
@@ -72,29 +75,7 @@ export default function Cart() {
                 <Check className="w-3.5 h-3.5" /> Listo
               </button>
             </div>
-            <input
-              type="text"
-              placeholder="Nombre"
-              className="w-full text-sm px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/50 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-colors"
-              value={clienteNombre}
-              onChange={(e) => setCliente(e.target.value, clienteApellido, clienteCedula)}
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="text"
-                placeholder="Apellidos"
-                className="w-full text-sm px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/50 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-colors"
-                value={clienteApellido}
-                onChange={(e) => setCliente(clienteNombre, e.target.value, clienteCedula)}
-              />
-              <input
-                type="text"
-                placeholder="Cédula / RUC"
-                className="w-full text-sm px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/50 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-colors"
-                value={clienteCedula}
-                onChange={(e) => setCliente(clienteNombre, clienteApellido, e.target.value)}
-              />
-            </div>
+            <ClienteFactura />
           </div>
         )}
       </div>

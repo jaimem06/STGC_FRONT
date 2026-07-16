@@ -39,22 +39,47 @@ export const billingApi = {
 };
 
 /**
- * Descarga el PDF de la factura y lo abre en una nueva pestaña. Devuelve la URL
- * temporal creada (para poder revocarla) o lanza si algo falla.
+ * Descarga el PDF de la factura y devuelve una URL temporal de blob lista para
+ * mostrarse en un visor embebido (iframe) o enlazarse a una descarga. Quien la
+ * consume debe revocarla con URL.revokeObjectURL cuando deje de usarla.
+ * (Se evita window.open: tras un await largo el navegador bloquea el popup.)
  */
-export const abrirFacturaPdf = async (pedidoId: string): Promise<void> => {
+export const crearUrlFacturaPdf = async (pedidoId: string): Promise<string> => {
   const blob = await billingApi.descargarComprobantePdf(pedidoId);
-  const url = window.URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
-  const tab = window.open(url, "_blank");
-  if (!tab) {
-    // Popup bloqueado: forzamos una descarga como alternativa.
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `factura_${pedidoId}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+  return window.URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+};
+
+/** Fuerza la descarga local de una URL de blob ya creada (sin popups). */
+export const descargarBlobComoArchivo = (url: string, filename: string): void => {
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
+/**
+ * Extrae el motivo devuelto por el billing-service desde un error de axios.
+ * Cuando la petición usó responseType "blob" (descarga de PDF), el cuerpo del
+ * error llega como Blob y hay que leerlo antes de poder interpretar el JSON.
+ */
+export const extraerMotivoBilling = async (error: unknown): Promise<string | undefined> => {
+  const data = (error as { response?: { data?: unknown } })?.response?.data;
+  if (!data) return undefined;
+  if (typeof data === "string") {
+    try {
+      return JSON.parse(data).message;
+    } catch {
+      return undefined;
+    }
   }
-  // Liberamos la URL tras un margen para que el navegador alcance a abrirla.
-  setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+  if (data instanceof Blob) {
+    try {
+      return JSON.parse(await data.text()).message;
+    } catch {
+      return undefined;
+    }
+  }
+  return (data as { message?: string }).message;
 };
