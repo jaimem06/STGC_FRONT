@@ -15,7 +15,8 @@ import {
   X,
   User as UserIcon,
   Box,
-  History
+  History,
+  BarChart3
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/uiStore";
@@ -25,6 +26,7 @@ const menuItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Punto de Venta", href: "/dashboard/pos", icon: Coffee },
   { name: "Inventario", href: "/dashboard/inventory", icon: Box },
+  { name: "Reportes", href: "/dashboard/reports", icon: BarChart3 },
   { name: "Trazabilidad", href: "/dashboard/traceability", icon: History },
   { name: "Usuarios", href: "/dashboard/users", icon: Users },
   { name: "Roles", href: "/dashboard/roles", icon: ShieldCheck },

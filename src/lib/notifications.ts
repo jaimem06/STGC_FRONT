@@ -21,13 +21,24 @@ export const toast = {
       },
     }),
 
-  warning: (message: string, description?: string, actionLabel: string = "Revisar", id?: string) =>
+  warning: (
+    message: string,
+    description?: string,
+    actionLabel: string = "Revisar",
+    id?: string,
+    onAction?: () => void
+  ) =>
     sonnerToast.warning(message, {
       id,
       description,
       duration: Infinity,
       action: {
         label: actionLabel,
+        onClick: () => onAction?.(),
+      },
+      // "Cancelar" descarta la alerta (para revisarla luego). Sonner cierra el toast al pulsarlo.
+      cancel: {
+        label: "Cancelar",
         onClick: () => {},
       },
     }),

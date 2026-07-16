@@ -41,7 +41,6 @@ export const ENDPOINTS = {
       STATUS: (id: string) => `inventario/pos/${id}/estado`,
       MOVEMENTS: "inventario/pos/movimientos",
       ITEM_MOVEMENTS: (id: string) => `inventario/pos/${id}/movimientos`,
-      EXPORT: "inventario/pos/movimientos/exportar",
       DELETED: "inventario/pos/eliminados",
       RESTORE: (id: string) => `inventario/pos/${id}/restaurar`,
       ALERTAS_STOCK: "inventario/pos/alertas-stock",
@@ -56,7 +55,6 @@ export const ENDPOINTS = {
       STATUS: (id: string) => `inventario/finca/${id}/estado`,
       MOVEMENTS: "inventario/finca/movimientos",
       ITEM_MOVEMENTS: (id: string) => `inventario/finca/${id}/movimientos`,
-      EXPORT: "inventario/finca/movimientos/exportar",
       DELETED: "inventario/finca/eliminados",
       RESTORE: (id: string) => `inventario/finca/${id}/restaurar`,
       ALERTAS_STOCK: "inventario/finca/alertas-stock",
@@ -88,5 +86,28 @@ export const ENDPOINTS = {
       PAGAR: (id: string) => `pedidos/${id}/pagar`,
       COMPROBANTE: (id: string) => `pedidos/${id}/comprobante`,
     }
+  },
+  REPORT: {
+    BASE_URL: normalizeBaseUrl(
+      process.env.NEXT_PUBLIC_REPORT_SERVICE_URL,
+      "https://report-service-nwpk.onrender.com"
+    ),
+    DASHBOARD: "reports/dashboard",
+    STOCK: "reports/stock",
+    MOVEMENTS: "reports/movements",
+    SALES: {
+      BASE: "reports/sales",
+      BY_DAY: "reports/sales/by-day",
+      BY_WEEK: "reports/sales/by-week",
+      BY_MONTH: "reports/sales/by-month",
+      BY_PRODUCT: "reports/sales/by-product",
+      BY_EMPLOYEE: "reports/sales/by-employee",
+      BY_EMPLOYEE_ID: (id: string) => `reports/sales/by-employee/${id}`,
+      WEEKS: "reports/sales/weeks",
+    },
+    EXPORT: {
+      CSV_FROM_DATA: "reports/export/csv/from-data",
+      PDF_FROM_DATA: "reports/export/pdf/from-data",
+    },
   }
 } as const;

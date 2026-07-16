@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 import { AlertCircle, Trash2, CheckCircle2 } from "lucide-react";
 
@@ -22,11 +23,22 @@ export default function Confirm({
   confirmText = "CONTINUAR",
   variant = "danger",
 }: ConfirmProps) {
+  // Salvaguarda contra el bloqueo de `pointer-events` que Radix puede dejar en el
+  // <body> al cerrar modales encadenados (Dialog -> Confirm).
+  useEffect(() => {
+    if (!open) {
+      const t = setTimeout(() => {
+        document.body.style.pointerEvents = "";
+      }, 0);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+
   return (
     <AlertDialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <AlertDialogPrimitive.Portal>
-        <AlertDialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm animate-in fade-in duration-300" />
-        <AlertDialogPrimitive.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] w-full max-w-md bg-surface rounded-[40px] p-8 shadow-2xl border border-outline-variant/20 animate-in zoom-in-95 duration-200">
+        <AlertDialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-xl animate-in fade-in duration-300" />
+        <AlertDialogPrimitive.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] w-full max-w-md bg-surface rounded-[40px] p-8 shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] border border-outline-variant/20 animate-in zoom-in-95 duration-200">
           <div className="flex flex-col items-center text-center">
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 shadow-sm ${
               variant === "danger" ? "bg-error/10 text-error" : 

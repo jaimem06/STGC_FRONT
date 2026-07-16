@@ -6,6 +6,7 @@ import { usePosStore, PagoInput } from "@/store/posStore";
 import { CreditCard, Banknote, Landmark, X, Receipt, Wallet, Smartphone } from "lucide-react";
 import { ENDPOINTS } from "@/lib/endpoints";
 import { toast } from "@/lib/notifications";
+import Input from "@/components/Input";
 
 interface CheckoutModalProps {
   total: number;
@@ -14,8 +15,8 @@ interface CheckoutModalProps {
 
 const PAYMENT_METHODS = [
   { id: "EFECTIVO", name: "Efectivo", icon: Banknote },
-  { id: "TARJETA_CREDITO", name: "Tarjeta Crédito", icon: CreditCard },
-  { id: "TARJETA_DEBITO", name: "Tarjeta Débito", icon: CreditCard },
+  { id: "TARJETA_CREDITO", name: "Tarjeta de Crédito", icon: CreditCard },
+  { id: "TARJETA_DEBITO", name: "Tarjeta de Débito", icon: CreditCard },
   { id: "TRANSFERENCIA", name: "Transferencia", icon: Landmark },
   { id: "DE_UNA", name: "De Una", icon: Smartphone },
   { id: "AHORITA", name: "Ahorita", icon: Wallet },
@@ -27,6 +28,7 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
   const { checkout, loading } = usePosStore();
   const [pagos, setPagos] = useState<PagoInput[]>([{ metodoPago: "EFECTIVO", monto: total }]);
   const [successData, setSuccessData] = useState<{ pedidoId?: string } | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const sumaMontos = pagos.reduce((acc, p) => acc + (p.monto || 0), 0);
   const diferencia = Math.round((total - sumaMontos) * 100) / 100;
@@ -44,7 +46,37 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
   const updatePago = (index: number, field: string, value: any) => {
     const nuevos = [...pagos];
     (nuevos[index] as any)[field] = field === "monto" ? parseFloat(value) || 0 : value;
+    
+    const nuevasValidaciones = { ...fieldErrors };
+    const pago = nuevos[index];
+    const newSumaMontos = nuevos.reduce((acc, p) => acc + (p.monto || 0), 0);
+    const newDiferencia = Math.round((total - newSumaMontos) * 100) / 100;
+    const isCompleteNow = newDiferencia === 0 && nuevos.length > 0;
+    
+    if (field === "monto") {
+      if (!value || value <= 0) {
+        nuevasValidaciones[`monto_${index}`] = "El monto debe ser mayor a 0";
+      } else {
+        delete nuevasValidaciones[`monto_${index}`];
+      }
+      
+      if (!isCompleteNow) {
+        nuevasValidaciones["total_mismatch"] = "La suma de los montos debe coincidir exactamente con el total";
+      } else {
+        delete nuevasValidaciones["total_mismatch"];
+      }
+    }
+    
+    if (field === "referencia_pago" && ELECTRONIC_METHODS.includes(pago.metodoPago)) {
+      if (!value || !value.trim()) {
+        nuevasValidaciones[`referencia_${index}`] = "Debe registrar el número de comprobante para la modalidad de pago seleccionada";
+      } else {
+        delete nuevasValidaciones[`referencia_${index}`];
+      }
+    }
+    
     setPagos(nuevos);
+    setFieldErrors(nuevasValidaciones);
   };
 
   const removePago = (index: number) => {
@@ -52,17 +84,25 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
   };
 
   const handleCheckout = async () => {
-    if (!isComplete) {
-      toast.error("La suma de los montos debe coincidir exactamente con el total");
+    // Check if there are any field-specific validation errors
+    const hasFieldErrors = pagos.some((pago, index) => {
+      if (ELECTRONIC_METHODS.includes(pago.metodoPago) && (!pago.referencia_pago || !pago.referencia_pago.trim())) {
+        return true;
+      }
+      if (!pago.monto || pago.monto <= 0) {
+        return true;
+      }
+      return false;
+    });
+
+    // If there are field errors, we don't proceed with checkout
+    if (hasFieldErrors || fieldErrors["total_mismatch"]) {
       return;
     }
 
-    // Validate electronic methods have referencia_pago (HU009-CA5)
-    for (const pago of pagos) {
-      if (ELECTRONIC_METHODS.includes(pago.metodoPago) && !pago.referencia_pago?.trim()) {
-        toast.error(`Debe registrar el número de comprobante para ${PAYMENT_METHODS.find(m => m.id === pago.metodoPago)?.name}`);
-        return;
-      }
+    if (!isComplete) {
+      toast.error("La suma de los montos debe coincidir exactamente con el total");
+      return;
     }
 
     const result = await checkout(pagos);
@@ -75,8 +115,8 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
     return (
       <Dialog.Root open={true} onOpenChange={onClose}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-surface rounded-2xl shadow-xl z-50 p-6 flex flex-col items-center">
+          <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-xl z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-surface rounded-2xl shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] z-50 p-6 flex flex-col items-center">
             <div className="w-16 h-16 bg-secondary-container rounded-full flex items-center justify-center mb-4">
               <Receipt className="w-8 h-8 text-secondary" />
             </div>
@@ -109,11 +149,18 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
   const usedMethods = pagos.map(p => p.metodoPago);
   const availableMethods = PAYMENT_METHODS.filter(m => !usedMethods.includes(m.id));
 
+  function formatComprobante(value: string): string {
+    const digits = value.replace(/\D/g, '').slice(0, 13);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
   return (
     <Dialog.Root open={true} onOpenChange={onClose}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-surface rounded-2xl shadow-xl z-50 p-6 flex flex-col max-h-[90vh]">
+        <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-xl z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-surface rounded-2xl shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] z-50 p-6 flex flex-col max-h-[90vh]">
           <div className="flex items-center justify-between mb-4">
             <Dialog.Title className="text-xl font-display font-bold text-primary">Procesar Pago</Dialog.Title>
             <Dialog.Close className="text-outline hover:text-error transition-colors">
@@ -126,6 +173,12 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
             <span className="text-sm font-medium text-primary">Total a Cobrar</span>
             <div className="text-4xl font-display font-bold text-primary mt-1">${total.toFixed(2)}</div>
           </div>
+
+          {fieldErrors["total_mismatch"] && (
+            <div className="bg-error/10 border border-error p-3 rounded-xl mb-4">
+              <p className="text-xs font-medium text-error">{fieldErrors["total_mismatch"]}</p>
+            </div>
+          )}
 
           {/* Payment Methods List */}
           <div className="space-y-3 mb-4 max-h-[50vh] overflow-auto">
@@ -147,25 +200,26 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
                   </div>
                   <div className="flex gap-2">
                     <div className="flex-1">
-                      <label className="text-xs text-on-surface-variant">Monto</label>
-                      <input
+                      <Input
                         type="number"
                         min={0}
                         step="0.01"
+                        label="Monto"
                         value={pago.monto || ""}
                         onChange={(e) => updatePago(index, "monto", e.target.value)}
-                        className="w-full p-2 text-sm rounded-lg border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none bg-surface"
+                        error={fieldErrors[`monto_${index}`]}
+                        placeholder="0.00"
                       />
                     </div>
                     {isElectronic && (
                       <div className="flex-[2]">
-                        <label className="text-xs text-on-surface-variant">N° Comprobante</label>
-                        <input
+                        <Input
                           type="text"
+                          label="N° Comprobante"
                           value={pago.referencia_pago || ""}
-                          onChange={(e) => updatePago(index, "referencia_pago", e.target.value)}
-                          placeholder="Obligatorio"
-                          className="w-full p-2 text-sm rounded-lg border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none bg-surface"
+                          onChange={(e) => updatePago(index, "referencia_pago", formatComprobante(e.target.value))}
+                          error={fieldErrors[`referencia_${index}`]}
+                          placeholder="xxx-xxx-xxxxxxx"
                         />
                       </div>
                     )}

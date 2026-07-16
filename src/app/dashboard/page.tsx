@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useInventoryStore } from "@/store/inventoryStore";
 import { toast } from "@/lib/notifications";
+import { buildStockAlertMessage } from "@/lib/stock-alerts";
 import {
   Package,
   AlertTriangle,
@@ -17,18 +19,23 @@ import {
 export default function DashboardPage() {
   const { user } = useAuthStore();
   const { stats, alertas, fetchDashboard } = useInventoryStore();
+  const router = useRouter();
 
   useEffect(() => {
     fetchDashboard()
       .then(() => {
-        // El toast usa el estado más reciente del store tras la carga.
+        // Mismo mensaje categorizado que la pantalla de inventario, con la misma
+        // fuente de datos (alertas del inventory-service).
         const current = useInventoryStore.getState().alertas;
-        if (current.length > 0) {
-          toast.warning(`Tienes ${current.length} producto(s) por debajo de su stock mínimo.`, undefined, "Revisar", "low-stock-alert");
+        const message = buildStockAlertMessage(current);
+        if (message) {
+          toast.warning(message, undefined, "Revisar", "low-stock-alert", () =>
+            router.push("/dashboard/inventory?alertas=1")
+          );
         }
       })
       .catch(() => toast.error("No se pudieron cargar las métricas de inventario."));
-  }, [fetchDashboard]);
+  }, [fetchDashboard, router]);
 
   const cards = [
     { name: "Productos en Catálogo", value: stats ? stats.total_items.toLocaleString() : "—", icon: Package, color: "text-blue-600", bg: "bg-blue-50" },

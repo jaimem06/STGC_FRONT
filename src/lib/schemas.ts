@@ -201,7 +201,7 @@ const BaseInventarioItemObject = z.object({
     .or(z.literal("")),
   modulo: ModuloInventarioEnum,
   stock_minimo: z.number({ message: "El stock mínimo es obligatorio." })
-    .min(0, "El stock mínimo no puede ser un número negativo.")
+    .gt(0, "El stock mínimo debe ser mayor a 0.")
     .max(10000, "El stock mínimo no puede superar 10000.")
     .int("El stock mínimo debe ser un número entero."),
   codigo_trazabilidad: z.string().uuid().nullable().optional(),
@@ -242,7 +242,11 @@ export const UpdateInventarioItemSchema = BaseInventarioItemObject.pick({
 }).extend({
   // HU019: motivo obligatorio solo cuando el precio cambia (se valida en el formulario).
   motivo: z.string().max(250, "El motivo no puede superar 250 caracteres.").optional(),
-});
+}).refine(
+  // Misma validación que en creación: la caducidad no puede ser anterior a hoy.
+  ExpiryDateRefinement,
+  ExpiryDateMessage
+);
 
 export const UpdateEstadoSchema = z.object({
   estado: EstadoInventarioEnum,

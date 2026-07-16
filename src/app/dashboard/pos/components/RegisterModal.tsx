@@ -13,8 +13,8 @@ interface RegisterModalProps {
 
 const PAYMENT_LABELS: Record<string, string> = {
   EFECTIVO: "Efectivo",
-  TARJETA_CREDITO: "Tarjeta Crédito",
-  TARJETA_DEBITO: "Tarjeta Débito",
+  TARJETA_CREDITO: "Tarjeta de Crédito",
+  TARJETA_DEBITO: "Tarjeta de Débito",
   TRANSFERENCIA: "Transferencia",
   DE_UNA: "De Una",
   AHORITA: "Ahorita"
@@ -68,8 +68,8 @@ export default function RegisterModal({ type, onClose }: RegisterModalProps) {
     return (
       <Dialog.Root open={true} onOpenChange={onClose}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-surface rounded-2xl shadow-xl z-50 p-6">
+          <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-xl z-50" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-surface rounded-2xl shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] z-50 p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 rounded-lg bg-secondary/10 text-secondary">
                 <Receipt className="w-6 h-6" />
@@ -138,8 +138,8 @@ export default function RegisterModal({ type, onClose }: RegisterModalProps) {
   return (
     <Dialog.Root open={true} onOpenChange={onClose}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-surface rounded-2xl shadow-xl z-50 p-6">
+        <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-xl z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-surface rounded-2xl shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] z-50 p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-lg ${type === 'OPEN' ? 'bg-secondary/10 text-secondary' : 'bg-error/10 text-error'}`}>

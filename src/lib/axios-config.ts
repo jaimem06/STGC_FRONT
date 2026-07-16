@@ -11,7 +11,7 @@ export const applyInterceptors = (instance: AxiosInstance) => {
           try {
             const parsed = JSON.parse(authStorage);
             token = parsed.state?.token?.trim();
-          } catch (e) {
+          } catch {
             // Silently fail in production
           }
         }
@@ -29,7 +29,8 @@ export const applyInterceptors = (instance: AxiosInstance) => {
     (error) => {
       const status = error.response?.status;
 
-      if (status === 401 && typeof window !== "undefined" && !(error.config as any)?._skipAuthInterceptor) {
+      const skipAuthInterceptor = (error.config as { _skipAuthInterceptor?: boolean } | undefined)?._skipAuthInterceptor;
+      if (status === 401 && typeof window !== "undefined" && !skipAuthInterceptor) {
         const publicPages = ["/login", "/password-recovery", "/reset-password"];
         const pathname = window.location.pathname;
 
