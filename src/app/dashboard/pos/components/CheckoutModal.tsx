@@ -115,8 +115,8 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
     return (
       <Dialog.Root open={true} onOpenChange={onClose}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-surface rounded-2xl shadow-xl z-50 p-6 flex flex-col items-center">
+          <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-xl z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-surface rounded-2xl shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] z-50 p-6 flex flex-col items-center">
             <div className="w-16 h-16 bg-secondary-container rounded-full flex items-center justify-center mb-4">
               <Receipt className="w-8 h-8 text-secondary" />
             </div>
@@ -159,8 +159,8 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
   return (
     <Dialog.Root open={true} onOpenChange={onClose}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-surface rounded-2xl shadow-xl z-50 p-6 flex flex-col max-h-[90vh]">
+        <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-xl z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-surface rounded-2xl shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] z-50 p-6 flex flex-col max-h-[90vh]">
           <div className="flex items-center justify-between mb-4">
             <Dialog.Title className="text-xl font-display font-bold text-primary">Procesar Pago</Dialog.Title>
             <Dialog.Close className="text-outline hover:text-error transition-colors">

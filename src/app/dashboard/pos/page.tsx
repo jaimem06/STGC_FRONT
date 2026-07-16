@@ -134,10 +134,10 @@ export default function PosPage() {
       {isRegisterOpen && mobilePanel && (
         <div className="lg:hidden fixed inset-0 z-[70] flex flex-col justify-end">
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
+            className="absolute inset-0 bg-black/40 backdrop-blur-xl animate-fade-in"
             onClick={() => setMobilePanel(null)}
           />
-          <div className="relative bg-surface rounded-t-3xl shadow-2xl h-[88vh] flex flex-col overflow-hidden animate-slide-up">
+          <div className="relative bg-surface rounded-t-3xl shadow-[0_-8px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] h-[88vh] flex flex-col overflow-hidden animate-slide-up">
             <div className="flex items-center justify-between p-3 border-b border-outline-variant shrink-0">
               <div className="flex gap-1 bg-surface-container rounded-xl p-1">
                 <button

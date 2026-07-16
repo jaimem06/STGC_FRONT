@@ -19,12 +19,23 @@ export default function Dialog({
   description,
   children,
 }: DialogProps) {
+  // Salvaguarda: al cerrar (o encadenar con otro modal como Confirm), Radix puede
+  // dejar `pointer-events: none` en el <body> y bloquear toda la interacción.
+  React.useEffect(() => {
+    if (!isOpen) {
+      const t = setTimeout(() => {
+        document.body.style.pointerEvents = "";
+      }, 0);
+      return () => clearTimeout(t);
+    }
+  }, [isOpen]);
+
   return (
     <RadixDialog.Root open={isOpen} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] animate-in fade-in duration-300" />
-        <RadixDialog.Content 
-          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-[32px] shadow-2xl p-6 border border-outline-variant/20 max-w-md w-[90vw] z-[101] animate-in zoom-in-95 duration-200 outline-none max-h-[90vh] overflow-y-auto"
+        <RadixDialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-xl z-[100] animate-in fade-in duration-300" />
+        <RadixDialog.Content
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-[32px] shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] p-6 border border-outline-variant/20 max-w-md w-[90vw] z-[101] animate-in zoom-in-95 duration-200 outline-none max-h-[90vh] overflow-y-auto"
         >
           <div className="flex justify-between items-start mb-4">
             <div>

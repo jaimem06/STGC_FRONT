@@ -8,22 +8,9 @@ export const ROLES = {
   ADMIN: "ADMIN",
   GERENTE_GENERAL: "GERENTE_GENERAL",
   GERENTE_OPERACIONES: "GERENTE_OPERACIONES",
-  
-  // Otros roles detectados en la BD
-  TECNICO_SEMBRADO: "TECNICO_SEMBRADO",
-  CONTROLADOR_DESPACHO: "CONTROLADOR_DESPACHO",
-  TECNICO_ALMACENAMIENTO: "TECNICO_ALMACENAMIENTO",
-  CAPATAZ: "CAPATAZ",
   CAJERO_MESERO: "CAJERO_MESERO",
-  CLASIFICADOR: "CLASIFICADOR",
   GESTOR_INVENTARIO: "GESTOR_INVENTARIO",
-  RECOLECTOR: "RECOLECTOR",
   PERSONAL_COCINA: "PERSONAL_COCINA",
-  ENCARGADO_SECADO: "ENCARGADO_SECADO",
-  GESTOR_CALIDAD: "GESTOR_CALIDAD",
-  TECNICO_DESPULPADO: "TECNICO_DESPULPADO",
-  SEMBRADOR: "SEMBRADOR",
-  TOSTADOR: "TOSTADOR",
 } as const;
 
 /**
@@ -48,11 +35,7 @@ const FULL_ACCESS = [
   "/dashboard/roles",
   "/dashboard/settings",
   "/dashboard/pos",
-];
-
-const OPERACIONES_ACCESS = [
-  "/dashboard/users",
-  "/dashboard/pos",
+  "/dashboard/reports",
 ];
 
 // Mapeo de permisos por rol exacto de la base de datos
@@ -60,12 +43,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   [ROLES.ADMIN]: FULL_ACCESS,
   [ROLES.GERENTE_GENERAL]: FULL_ACCESS,
   [ROLES.GERENTE_OPERACIONES]: FULL_ACCESS,
-  
-  // Habilitamos acceso a gestión de roles para el CAPATAZ
-  [ROLES.CAPATAZ]: ["/dashboard", "/dashboard/roles"],
-  
-  [ROLES.GESTOR_INVENTARIO]: ["/dashboard", "/dashboard/inventory"],
-  [ROLES.GESTOR_CALIDAD]: ["/dashboard", "/dashboard/traceability"],
+
+  [ROLES.GESTOR_INVENTARIO]: ["/dashboard", "/dashboard/inventory", "/dashboard/reports"],
   [ROLES.CAJERO_MESERO]: ["/dashboard", "/dashboard/pos"],
   [ROLES.PERSONAL_COCINA]: ["/dashboard", "/dashboard/pos"],
 };
@@ -83,10 +62,14 @@ export function canAccess(roleName: string | undefined, path: string): boolean {
 
   const allowedPaths = ROLE_PERMISSIONS[normalizedRole];
   if (!allowedPaths) return false;
-  
-  return allowedPaths.some(allowedPath => 
-    path === allowedPath || path.startsWith(`${allowedPath}/`)
-  );
+
+  return allowedPaths.some(allowedPath => {
+    // La raíz "/dashboard" (que todos los roles tienen) solo concede el propio
+    // dashboard, nunca actúa como comodín para las subrutas /dashboard/*.
+    if (allowedPath === "/dashboard") return path === "/dashboard";
+    // Las secciones sí incluyen sus subrutas (p. ej. /dashboard/inventory/123).
+    return path === allowedPath || path.startsWith(`${allowedPath}/`);
+  });
 }
 
 /**
@@ -100,8 +83,6 @@ export function getDefaultRoute(roleName: string | undefined): string {
   if (normalizedRole === ROLES.ADMIN || normalizedRole === ROLES.GERENTE_GENERAL || normalizedRole === ROLES.GERENTE_OPERACIONES) {
     return "/dashboard";
   }
-  
-  if (normalizedRole === ROLES.CAPATAZ) return "/dashboard/roles";
   
   if (normalizedRole === ROLES.CAJERO_MESERO || normalizedRole === ROLES.PERSONAL_COCINA) {
     return "/dashboard/pos";

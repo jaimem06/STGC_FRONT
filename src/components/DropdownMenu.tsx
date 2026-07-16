@@ -3,7 +3,19 @@
 import * as React from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 
-const DropdownMenu = DropdownMenuPrimitive.Root;
+/**
+ * Envolvemos el Root para que por defecto sea `modal={false}`.
+ * En modo modal, Radix pone `pointer-events: none` en el <body> mientras el menú
+ * está abierto; al abrir un Dialog desde un ítem, esa limpieza compite con la del
+ * Dialog y el body puede quedar bloqueado (los botones dejan de responder al click).
+ * Con `modal={false}` se evita ese bloqueo. Se puede sobreescribir por prop.
+ */
+const DropdownMenu = ({
+  modal = false,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) => (
+  <DropdownMenuPrimitive.Root modal={modal} {...props} />
+);
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
 

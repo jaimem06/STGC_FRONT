@@ -77,23 +77,6 @@ export const inventoryApi = {
     if (query) url += `?${query}`;
     return inventoryInstance.get<unknown[]>(url);
   },
-  // Exportar con autenticación (blob)
-  exportGeneralMovements: async () => {
-    const response = await inventoryInstance.get(POS.EXPORT, {
-      responseType: "blob",
-    });
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute(
-      "download",
-      `reporte_movimientos_pos_${new Date().toISOString().split("T")[0]}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  },
-
   // Gestión de Lotes y Trazabilidad (rutas del backend: /trazabilidad/...)
   listLots: () => {
     return inventoryInstance.get<LoteCafe[]>(TRACE.LOTS);

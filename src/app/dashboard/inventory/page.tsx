@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { inventoryApi } from "@/lib/inventory-service";
@@ -9,7 +10,7 @@ import {
   Package, Plus, ArrowUpRight, Tag, Layers,
   AlertTriangle, ClipboardList, BarChart3,
   Edit, History, Archive, ArchiveRestore, Activity, DollarSign,
-  FileSpreadsheet, RefreshCw, EyeOff, Eye, MoreVertical
+  RefreshCw, EyeOff, Eye, MoreVertical
 } from "lucide-react";
 import {
   CreateInventarioItemSchema, CreateInventarioItemInput,
@@ -27,6 +28,7 @@ import Dialog from "@/components/Dialog";
 import Confirm from "@/components/Confirm";
 import Search from "@/components/Search";
 import { toast } from "@/lib/notifications";
+import { buildStockAlertMessage } from "@/lib/stock-alerts";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -75,12 +77,16 @@ interface ConfirmState {
 }
 
 export default function InventoryPage() {
+  const router = useRouter();
   const { items, deletedItems, loading, fetchItems, fetchDeleted } = useInventoryStore();
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [showDeleted, setShowDeleted] = useState(false);
+  // HU028: filtro "solo alertas" (stock bajo / agotado / caducado). Se puede
+  // activar desde la notificación "Revisar" o desde ?alertas=1 (redirección del dashboard).
+  const [alertFilter, setAlertFilter] = useState(false);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -164,31 +170,33 @@ export default function InventoryPage() {
 
   useEffect(() => { refreshList(); }, [refreshList]);
 
-  // HU028: notificación proactiva de stock bajo al montar.
+  // Activa el filtro de alertas si se llega desde el dashboard (?alertas=1).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("alertas") === "1") {
+      setAlertFilter(true);
+    }
+  }, []);
+
+  // HU028: notificación proactiva de stock bajo al montar. "Revisar" filtra la tabla.
   useEffect(() => {
     inventoryApi.listAlertasStock()
       .then((res) => {
-        if (res.data.length > 0) {
-          const agotados = res.data.filter((a) => a.mensaje === "Producto Agotado").length;
-          const caducados = res.data.filter((a) => a.mensaje === "Producto Caducado").length;
-          const bajoStock = res.data.filter((a) => a.mensaje === "Stock por debajo del mínimo").length;
-          
-          const msgs = [];
-          if (caducados > 0) msgs.push(`${caducados} caducado(s)`);
-          if (agotados > 0) msgs.push(`${agotados} agotado(s)`);
-          if (bajoStock > 0) msgs.push(`${bajoStock} con stock bajo`);
-          
-          toast.warning(`Tienes alertas: ${msgs.join(", ")}.`, undefined, "Revisar", "inventory-alert");
+        const msg = buildStockAlertMessage(res.data);
+        if (msg) {
+          toast.warning(msg, undefined, "Revisar", "inventory-alert", () => setAlertFilter(true));
         }
       })
       .catch(() => {});
   }, []);
 
-  // HU028: métricas calculadas con la matemática viva (cantidad <= stock_minimo).
+  // HU028: métricas contadas por `estado` (misma fuente que el filtro de la tabla
+  // y que get_stats del backend), para que las tarjetas coincidan con lo filtrado.
   const stats = useMemo(() => {
     const totalItems = items.length;
-    const lowStock = items.filter(i => i.cantidad > 0 && i.cantidad <= (i.stock_minimo ?? 0)).length;
-    const outOfStock = items.filter(i => i.cantidad <= 0).length;
+    const lowStock = items.filter(i => i.estado === "STOCK_BAJO").length;
+    const outOfStock = items.filter(i => i.estado === "AGOTADO").length;
     return { totalItems, lowStock, outOfStock };
   }, [items]);
 
@@ -375,18 +383,6 @@ export default function InventoryPage() {
     }
   };
 
-  const handleExportGeneralReport = async () => {
-    setIsActionLoading(true);
-    try {
-      await inventoryApi.exportGeneralMovements();
-      toast.success("Reporte generado con éxito.");
-    } catch (err) {
-      handleError(err, "Exportación");
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
   const fetchHistory = useCallback(async () => {
     if (!selectedItem) return;
     try {
@@ -400,14 +396,20 @@ export default function InventoryPage() {
   useEffect(() => { if (isHistoryModalOpen && selectedItem) fetchHistory(); }, [isHistoryModalOpen, selectedItem, historyDates, fetchHistory]);
 
   const sourceItems = showDeleted ? deletedItems : items;
+  /** Un ítem está "en alerta" si está agotado, bajo mínimo o caducado. */
+  const isAlerta = (i: InventarioItem) => {
+    const caducado = !!i.fecha_caducidad && new Date(i.fecha_caducidad) <= new Date();
+    return i.cantidad <= (i.stock_minimo ?? 0) || caducado;
+  };
   const filteredItems = useMemo(() => {
     return sourceItems.filter(i => {
       const matchesSearch = search === "" || i.nombre.toLowerCase().includes(search.toLowerCase()) || i.sku.toLowerCase().includes(search.toLowerCase());
       const matchesType = filterType === "ALL" || i.tipo === filterType;
       const matchesStatus = filterStatus === "ALL" || i.estado === filterStatus;
-      return matchesSearch && matchesType && matchesStatus;
+      const matchesAlert = !alertFilter || isAlerta(i);
+      return matchesSearch && matchesType && matchesStatus && matchesAlert;
     });
-  }, [sourceItems, search, filterType, filterStatus]);
+  }, [sourceItems, search, filterType, filterStatus, alertFilter]);
 
   const columns = [
     {
@@ -510,7 +512,7 @@ export default function InventoryPage() {
           <button onClick={() => setShowDeleted((v) => !v)} className={`flex items-center gap-2 h-11 px-5 rounded-xl font-bold text-[11px] border transition-all shadow-sm ${showDeleted ? "bg-primary text-white border-transparent" : "bg-white text-primary border-outline-variant/30 hover:bg-surface-container"}`}>
             {showDeleted ? <Eye size={18} /> : <EyeOff size={18} />} {showDeleted ? "VER TODOS" : "VER DE BAJA"}
           </button>
-          <button onClick={handleExportGeneralReport} className="flex items-center gap-2 h-11 px-5 bg-white text-primary rounded-xl font-bold text-[11px] border border-outline-variant/30 hover:bg-surface-container transition-all shadow-sm"><FileSpreadsheet size={18} /> EXPORTAR CSV</button>
+          <button onClick={() => router.push("/dashboard/reports?tab=movimientos")} className="flex items-center gap-2 h-11 px-5 bg-white text-primary rounded-xl font-bold text-[11px] border border-outline-variant/30 hover:bg-surface-container transition-all shadow-sm"><BarChart3 size={18} /> VER REPORTES</button>
           <button onClick={() => { resetCreate(); setIsCreateModalOpen(true); }} className="flex items-center gap-2 h-11 px-5 bg-primary text-white rounded-xl font-bold text-[11px] hover:bg-primary-container shadow-lg shadow-primary/20"><Plus size={18} /> NUEVO PRODUCTO</button>
         </div>
       </div>
@@ -530,17 +532,28 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
-        <div className="xl:col-span-1 bg-white p-5 rounded-[28px] border border-outline-variant/30 shadow-sm space-y-4">
-          <Search value={search} onChange={setSearch} placeholder="Buscar..." />
-          <div className="space-y-3">
-            <Select label="Categoría" value={filterType} onValueChange={setFilterType} options={[{ value: "ALL", label: "Todas" }, ...TipoElementoEnum.options.map(t => ({ value: t, label: t.replace("_", " ") }))]} />
-            <Select label="Estado" value={filterStatus} onValueChange={setFilterStatus} options={[{ value: "ALL", label: "Todos" }, ...EstadoInventarioEnum.options.map(s => ({ value: s, label: s.replace("_", " ") }))]} />
-          </div>
-          {showDeleted && <p className="text-[10px] font-bold text-outline uppercase tracking-widest bg-surface-container rounded-xl p-3">Mostrando productos dados de baja.</p>}
-        </div>
-        <div className="xl:col-span-3 bg-white rounded-[28px] border border-outline-variant/20 overflow-hidden shadow-sm min-h-[400px]"><Table data={filteredItems} columns={columns} rowKey={(i) => i.id} pageSize={10} /></div>
+      {/* Barra de filtros compacta (encima de la tabla) */}
+      <div className="bg-white p-3 rounded-2xl border border-outline-variant/20 shadow-sm flex flex-wrap items-end gap-3">
+        <div className="flex-1 min-w-[200px]"><Search value={search} onChange={setSearch} placeholder="Buscar..." /></div>
+        <Select className="w-full sm:w-48" label="Categoría" value={filterType} onValueChange={setFilterType} options={[{ value: "ALL", label: "Todas" }, ...TipoElementoEnum.options.map(t => ({ value: t, label: t.replace("_", " ") }))]} />
+        <Select className="w-full sm:w-48" label="Estado" value={filterStatus} onValueChange={setFilterStatus} options={[{ value: "ALL", label: "Todos" }, ...EstadoInventarioEnum.options.map(s => ({ value: s, label: s.replace("_", " ") }))]} />
+        {alertFilter && (
+          <button
+            onClick={() => setAlertFilter(false)}
+            className="h-[38px] flex items-center gap-2 px-3 rounded-xl text-[10px] font-black text-amber-700 uppercase tracking-widest bg-amber-50 border border-amber-200/60 hover:bg-amber-100 transition-colors whitespace-nowrap"
+          >
+            <AlertTriangle size={14} /> Solo alertas <span className="text-amber-600">✕</span>
+          </button>
+        )}
+        {showDeleted && (
+          <span className="h-[38px] flex items-center px-3 rounded-xl text-[10px] font-bold text-outline uppercase tracking-widest bg-surface-container whitespace-nowrap">
+            Productos de baja
+          </span>
+        )}
       </div>
+
+      {/* Tabla a todo el ancho */}
+      <div className="bg-white rounded-[28px] border border-outline-variant/20 overflow-hidden shadow-sm min-h-[400px]"><Table data={filteredItems} columns={columns} rowKey={(i) => i.id} pageSize={10} /></div>
 
       {/* Crear */}
       <Dialog isOpen={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} title="Crear Producto/Insumo">
