@@ -361,7 +361,7 @@ export const usePosStore = create<PosState>((set, get) => ({
       const res = await posService.cerrarCaja(monto);
       set({ isRegisterOpen: false, pedidosActivos: [], loading: false });
       if (res.turno.estado === 'CERRADO_CON_DESCUADRE') {
-        toast.info(`Caja cerrada con descuadre. Diferencia: $${res.turno.diferencia}`);
+        toast.info(`Caja cerrada con descuadre. Diferencia: $${round2(res.turno.diferencia).toFixed(2)}`);
       } else {
         toast.success("Caja cerrada exitosamente");
       }

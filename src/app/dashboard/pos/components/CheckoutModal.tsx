@@ -31,6 +31,7 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
   const [successData, setSuccessData] = useState<{ pedidoId?: string; comprobante?: Comprobante } | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const sumaMontos = round2(pagos.reduce((acc, p) => acc + (p.monto || 0), 0));
   const diferencia = round2(total - sumaMontos);
@@ -40,23 +41,24 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
   const sumaOtros = (arr: PagoInput[], skip: number) =>
     round2(arr.reduce((acc, p, i) => (i === skip ? acc : acc + (p.monto || 0)), 0));
 
-  /** Recalcula errores de referencia/monto para el arreglo dado. */
-  const recomputeErrors = (arr: PagoInput[]) => {
+  /** Recalcula errores de referencia/monto para el arreglo dado (solo campos tocados). */
+  const recomputeErrors = (arr: PagoInput[], touchedState: Record<string, boolean>) => {
     const errs: Record<string, string> = {};
-    arr.forEach((p, i) => {
-      if (ELECTRONIC_METHODS.includes(p.metodoPago) && (!p.referencia_pago || !p.referencia_pago.trim())) {
-        errs[`referencia_${i}`] = "Registra el N° de comprobante de esta modalidad";
+    arr.forEach((p) => {
+      const k = p.metodoPago;
+      if (touchedState[`referencia_${k}`] && ELECTRONIC_METHODS.includes(p.metodoPago) && (!p.referencia_pago || !p.referencia_pago.trim())) {
+        errs[`referencia_${k}`] = "Registra el N° de comprobante de esta modalidad";
       }
-      if (!p.monto || p.monto <= 0) {
-        errs[`monto_${i}`] = "El monto debe ser mayor a 0";
+      if (touchedState[`monto_${k}`] && (!p.monto || p.monto <= 0)) {
+        errs[`monto_${k}`] = "El monto debe ser mayor a 0";
       }
     });
     return errs;
   };
 
-  const commit = (arr: PagoInput[]) => {
+  const commit = (arr: PagoInput[], touchedState: Record<string, boolean> = touched) => {
     setPagos(arr);
-    setFieldErrors(recomputeErrors(arr));
+    setFieldErrors(recomputeErrors(arr, touchedState));
   };
 
   const addPago = (metodoPago: string) => {
@@ -66,7 +68,8 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
     }
     // El nuevo método absorbe automáticamente el resto pendiente.
     const restante = round2(total - sumaMontos);
-    commit([...pagos, { metodoPago, monto: restante > 0 ? restante : 0, referencia_pago: "" }]);
+    const next = [...pagos, { metodoPago, monto: restante > 0 ? restante : 0, referencia_pago: "" }];
+    setPagos(next);
   };
 
   /**
@@ -83,19 +86,28 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
       const resto = round2(total - sumaOtros(next, balanceIdx));
       next[balanceIdx] = { ...next[balanceIdx], monto: resto > 0 ? resto : 0 };
     }
-    commit(next);
+    const k = pagos[index].metodoPago;
+    const t = { ...touched, [`monto_${k}`]: true };
+    setTouched(t);
+    commit(next, t);
   };
 
   /** Asigna a esta fila exactamente el saldo restante (one-tap). */
   const asignarResto = (index: number) => {
+    const k = pagos[index].metodoPago;
     const resto = round2(total - sumaOtros(pagos, index));
     const next = pagos.map((p, i) => (i === index ? { ...p, monto: resto > 0 ? resto : 0 } : p));
-    commit(next);
+    const t = { ...touched, [`monto_${k}`]: true };
+    setTouched(t);
+    commit(next, t);
   };
 
   const setReferencia = (index: number, value: string) => {
+    const k = pagos[index].metodoPago;
     const next = pagos.map((p, i) => (i === index ? { ...p, referencia_pago: value } : p));
-    commit(next);
+    const t = { ...touched, [`referencia_${k}`]: true };
+    setTouched(t);
+    commit(next, t);
   };
 
   const removePago = (index: number) => {
@@ -109,8 +121,14 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
     commit(restantes);
   };
 
-  const handleCheckout = async () => {
-    const errs = recomputeErrors(pagos);
+  const handleCheckout = async (metodoPago: string) => {
+    const allTouched: Record<string, boolean> = {};
+    pagos.forEach((p) => {
+      allTouched[`monto_${p.metodoPago}`] = true;
+      allTouched[`referencia_${p.metodoPago}`] = true;
+    });
+    setTouched(allTouched);
+    const errs = recomputeErrors(pagos, allTouched);
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
@@ -121,6 +139,9 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
     }
     const result = await checkout(pagos);
     if (result.success) setSuccessData(result);
+    
+    const restante = round2(total - sumaMontos);
+    commit([...pagos, { metodoPago, monto: restante > 0 ? restante : 0, referencia_pago: "" }]);
   };
 
   const handleFactura = async () => {
@@ -232,8 +253,8 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
               const method = PAYMENT_METHODS.find((m) => m.id === pago.metodoPago)!;
               const Icon = method.icon;
               const isElectronic = ELECTRONIC_METHODS.includes(pago.metodoPago);
-              const montoErr = fieldErrors[`monto_${index}`];
-              const refErr = fieldErrors[`referencia_${index}`];
+              const montoErr = fieldErrors[`monto_${pago.metodoPago}`];
+              const refErr = fieldErrors[`referencia_${pago.metodoPago}`];
 
               return (
                 <div
@@ -271,6 +292,11 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
                     )}
                   </div>
 
+                  {/* Error del monto, justo debajo de su campo */}
+                  {montoErr && (
+                    <p className="text-[11px] font-medium text-error mt-1.5 pl-[46px]">{montoErr}</p>
+                  )}
+
                   {/* Fila secundaria: botón Resto + referencia (si aplica) */}
                   <div className="flex items-center gap-2 mt-2 pl-[46px]">
                     <button
@@ -290,8 +316,10 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
                       />
                     )}
                   </div>
-                  {(montoErr || refErr) && (
-                    <p className="text-[11px] font-medium text-error mt-1.5 pl-[46px]">{montoErr || refErr}</p>
+
+                  {/* Error de la referencia, justo debajo de su campo */}
+                  {refErr && (
+                    <p className="text-[11px] font-medium text-error mt-1.5 pl-[46px]">{refErr}</p>
                   )}
                 </div>
               );
