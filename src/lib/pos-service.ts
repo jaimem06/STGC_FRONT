@@ -78,12 +78,28 @@ export const posService = {
 
   pagarPedido: async (id: string, data: {
     pagos: Array<{ metodoPago: string; monto: number; referencia_pago?: string }>;
-  }) => {
+  }): Promise<{ pedido: unknown; vuelto: number; advertencias?: string[] }> => {
     const res = await api.post(ENDPOINTS.POS_SERVICE.PEDIDOS.PAGAR(id), data);
     return res.data;
   },
 
   getComprobanteUrl: (id: string) => {
     return `${ENDPOINTS.POS_SERVICE.BASE_URL}${ENDPOINTS.POS_SERVICE.PEDIDOS.COMPROBANTE(id)}`;
-  }
+  },
+
+  /** Clientes ya facturados que coinciden con lo tipeado (nombre, apellido o cédula), para autocompletar. */
+  buscarClientes: async (q: string): Promise<ClienteSugerido[]> => {
+    if (q.trim().length < 2) return [];
+    const res = await api.get(ENDPOINTS.POS_SERVICE.CLIENTES, { params: { q } });
+    return res.data;
+  },
 };
+
+export interface ClienteSugerido {
+  id: string;
+  cedula: string;
+  nombre: string;
+  apellido: string;
+  vecesUsado: number;
+  ultimoUso: string;
+}

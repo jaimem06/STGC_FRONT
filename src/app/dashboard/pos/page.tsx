@@ -2,22 +2,28 @@
 
 import { useEffect, useState } from "react";
 import { usePosStore } from "@/store/posStore";
+import { descargarBlobComoArchivo } from "@/lib/billing-service";
 import ProductList from "./components/ProductList";
 import Cart from "./components/Cart";
 import RegisterModal from "./components/RegisterModal";
 import OrdersPanel from "./components/OrdersPanel";
-import { Coffee, Store, ClipboardList, ShoppingCart, X } from "lucide-react";
+import FacturasHistorialPanel from "./components/FacturasHistorialPanel";
+import { Coffee, Store, ClipboardList, ShoppingCart, X, ArrowLeft, Download, Receipt } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
 type ModalType = "OPEN" | "CLOSE" | null;
-type MobilePanel = "cart" | "orders" | null;
+type RightPanel = "cart" | "orders" | "facturas";
+type MobilePanel = RightPanel | null;
 
 const IVA_RATE = 0.15;
 
 export default function PosPage() {
-  const { fetchProductos, fetchPedidosActivos, loading, isRegisterOpen, cart } = usePosStore();
+  const {
+    fetchProductos, fetchPedidosActivos, loading, isRegisterOpen, cart,
+    facturaPdfUrl, facturaPdfNumero, cerrarFacturaPdf,
+  } = usePosStore();
   const [modalType, setModalType] = useState<ModalType>(null);
-  const [showOrdersPanel, setShowOrdersPanel] = useState(false);
+  const [rightPanel, setRightPanel] = useState<RightPanel>("cart");
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>(null);
 
   useEffect(() => {
@@ -30,12 +36,59 @@ export default function PosPage() {
     }
   }, [isRegisterOpen, fetchPedidosActivos]);
 
+  // Si el cajero navega fuera del POS mientras ve una factura, liberamos el
+  // blob y limpiamos el estado: al volver no debe reaparecer una factura vieja.
+  useEffect(() => {
+    return () => {
+      if (usePosStore.getState().facturaPdfUrl) {
+        usePosStore.getState().cerrarFacturaPdf();
+      }
+    };
+  }, []);
+
   const cartCount = cart.reduce((acc, item) => acc + item.cantidad, 0);
   const cartSubtotal = cart.reduce((acc, item) => acc + item.precioUnitario * item.cantidad, 0);
   const cartTotal = Math.round(cartSubtotal * (1 + IVA_RATE) * 100) / 100;
 
   if (loading && !isRegisterOpen) {
     return <LoadingSpinner size={48} message="Cargando POS..." fullPage />;
+  }
+
+  // Vista de la factura en el cuerpo de la página: un PDF completo se ve mejor
+  // usando todo el ancho/alto disponible que encerrado en un modal.
+  if (facturaPdfUrl) {
+    return (
+      <div className="flex flex-col lg:h-[calc(100vh-6rem)]">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={cerrarFacturaPdf}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl border border-outline-variant hover:bg-surface-container transition-colors text-sm font-semibold text-on-surface-variant hover:text-primary shrink-0"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">Volver al Punto de Venta</span>
+              <span className="sm:hidden">Volver</span>
+            </button>
+            <h1 className="text-lg sm:text-xl font-display font-bold text-on-surface truncate">
+              Factura {facturaPdfNumero}
+            </h1>
+          </div>
+          <button
+            onClick={() => descargarBlobComoArchivo(facturaPdfUrl, `factura-${facturaPdfNumero}.pdf`)}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-xl bg-secondary text-on-secondary hover:bg-secondary/90 transition-colors active:scale-95 shrink-0"
+          >
+            <Download className="w-4 h-4" /> Descargar
+          </button>
+        </div>
+        <div className="flex-1 min-h-[75vh] lg:min-h-0 bg-surface rounded-2xl shadow-sm border border-outline-variant overflow-hidden">
+          <iframe
+            src={`${facturaPdfUrl}#zoom=80`}
+            title={`Factura ${facturaPdfNumero}`}
+            className="w-full h-full bg-surface-container-high"
+          />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -63,23 +116,38 @@ export default function PosPage() {
           <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
             <h1 className="text-xl sm:text-2xl font-display font-bold text-on-surface">Punto de Venta</h1>
             <div className="flex gap-2">
-              <button
-                onClick={() => { setShowOrdersPanel(!showOrdersPanel); if (!showOrdersPanel) fetchPedidosActivos(); }}
-                className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl border transition-colors text-sm font-medium ${
-                  showOrdersPanel
-                    ? "bg-primary/10 border-primary/40 text-primary"
-                    : "border-outline-variant hover:bg-surface-container"
-                }`}
-              >
-                <ClipboardList className="w-4 h-4" />
-                <span className="hidden sm:inline">Pedidos Activos</span>
-                <span className="sm:hidden">Pedidos</span>
-              </button>
+              {(
+                [
+                  { panel: "orders", icon: ClipboardList, full: "Pedidos Activos", short: "Pedidos" },
+                  { panel: "facturas", icon: Receipt, full: "Mis Facturas", short: "Facturas" },
+                ] as const
+              ).map(({ panel, icon: Icon, full, short }) => {
+                const activo = rightPanel === panel;
+                return (
+                  <button
+                    key={panel}
+                    onClick={() => {
+                      const next = activo ? "cart" : panel;
+                      setRightPanel(next);
+                      if (next === "orders") fetchPedidosActivos();
+                    }}
+                    className={`inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl border text-sm font-medium whitespace-nowrap leading-none transition-colors ${
+                      activo
+                        ? "bg-primary/10 border-primary/40 text-primary"
+                        : "bg-surface border-outline-variant hover:bg-surface-container"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="hidden sm:inline">{full}</span>
+                    <span className="sm:hidden">{short}</span>
+                  </button>
+                );
+              })}
               <button
                 onClick={() => setModalType("CLOSE")}
-                className="flex items-center gap-2 text-sm text-error hover:bg-error-container hover:text-error px-3 sm:px-4 py-2 rounded-xl transition-colors font-medium border border-error/30"
+                className="inline-flex items-center justify-center gap-2 text-sm text-error hover:bg-error-container hover:text-error px-3 sm:px-4 py-2 rounded-xl transition-colors font-medium border border-error/30 whitespace-nowrap leading-none"
               >
-                <Store className="w-4 h-4" />
+                <Store className="w-4 h-4 shrink-0" />
                 <span className="hidden sm:inline">Cerrar Caja</span>
                 <span className="sm:hidden">Cerrar</span>
               </button>
@@ -103,7 +171,13 @@ export default function PosPage() {
 
             {/* Desktop right panel */}
             <div className="hidden lg:flex w-full lg:w-[420px] flex-col bg-surface rounded-2xl shadow-sm border border-outline-variant overflow-hidden">
-              {showOrdersPanel ? <OrdersPanel onClose={() => setShowOrdersPanel(false)} /> : <Cart />}
+              {rightPanel === "orders" ? (
+                <OrdersPanel onClose={() => setRightPanel("cart")} />
+              ) : rightPanel === "facturas" ? (
+                <FacturasHistorialPanel onClose={() => setRightPanel("cart")} />
+              ) : (
+                <Cart />
+              )}
             </div>
           </div>
 
@@ -138,11 +212,11 @@ export default function PosPage() {
             onClick={() => setMobilePanel(null)}
           />
           <div className="relative bg-surface rounded-t-3xl shadow-[0_-8px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] h-[88vh] flex flex-col overflow-hidden animate-slide-up">
-            <div className="flex items-center justify-between p-3 border-b border-outline-variant shrink-0">
-              <div className="flex gap-1 bg-surface-container rounded-xl p-1">
+            <div className="flex items-center justify-between p-3 border-b border-outline-variant shrink-0 gap-2">
+              <div className="flex gap-1 bg-surface-container rounded-xl p-1 overflow-x-auto no-scrollbar">
                 <button
                   onClick={() => setMobilePanel("cart")}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors shrink-0 ${
                     mobilePanel === "cart" ? "bg-surface text-primary shadow-sm" : "text-on-surface-variant"
                   }`}
                 >
@@ -150,24 +224,36 @@ export default function PosPage() {
                 </button>
                 <button
                   onClick={() => { setMobilePanel("orders"); fetchPedidosActivos(); }}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors shrink-0 ${
                     mobilePanel === "orders" ? "bg-surface text-primary shadow-sm" : "text-on-surface-variant"
                   }`}
                 >
                   Pedidos activos
                 </button>
+                <button
+                  onClick={() => setMobilePanel("facturas")}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors shrink-0 ${
+                    mobilePanel === "facturas" ? "bg-surface text-primary shadow-sm" : "text-on-surface-variant"
+                  }`}
+                >
+                  Facturas
+                </button>
               </div>
               <button
                 onClick={() => setMobilePanel(null)}
-                className="p-2 rounded-full text-outline hover:bg-surface-container hover:text-on-surface transition-colors"
+                className="p-2 rounded-full text-outline hover:bg-surface-container hover:text-on-surface transition-colors shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-hidden">
-              {mobilePanel === "orders"
-                ? <OrdersPanel onClose={() => setMobilePanel("cart")} />
-                : <Cart />}
+              {mobilePanel === "orders" ? (
+                <OrdersPanel onClose={() => setMobilePanel("cart")} />
+              ) : mobilePanel === "facturas" ? (
+                <FacturasHistorialPanel onClose={() => setMobilePanel("cart")} />
+              ) : (
+                <Cart />
+              )}
             </div>
           </div>
         </div>
