@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { usePosStore, PagoInput, validarClienteFactura } from "@/store/posStore";
+import { useUIStore } from "@/store/uiStore";
 import {
   CreditCard, Banknote, Landmark, X, Receipt, Wallet, Smartphone,
-  FileText, Loader2, Plus, Sparkles, Download, AlertTriangle, CheckCircle2, UserRound,
+  FileText, Loader2, Plus, Sparkles, AlertTriangle, CheckCircle2, UserRound,
 } from "lucide-react";
 import {
-  billingApi, crearUrlFacturaPdf, descargarBlobComoArchivo, extraerMotivoBilling, Comprobante,
+  billingApi, crearUrlFacturaPdf, extraerMotivoBilling, Comprobante,
 } from "@/lib/billing-service";
 import ClienteFactura from "./ClienteFactura";
 
@@ -38,23 +39,21 @@ interface SuccessData {
 }
 
 export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
-  const { checkout, loading, facturaConDatos } = usePosStore();
+  const { checkout, loading, facturaConDatos, mostrarFacturaPdf } = usePosStore();
+  const { isSidebarCollapsed } = useUIStore();
+  // El sidebar es fijo y reserva su ancho en el layout (md:pl-64 / md:pl-20),
+  // pero los modales de Radix se centran contra el viewport completo: sin este
+  // ajuste, quedan corridos hacia la izquierda (más espacio libre a la derecha)
+  // en pantallas md+. En mobile el sidebar no reserva espacio, así que no aplica.
+  const modalCenterX = isSidebarCollapsed
+    ? "left-1/2 -translate-x-1/2 md:left-[calc(50%+40px)]"
+    : "left-1/2 -translate-x-1/2 md:left-[calc(50%+128px)]";
   const [pagos, setPagos] = useState<PagoInput[]>([{ metodoPago: "EFECTIVO", monto: total }]);
   const [successData, setSuccessData] = useState<SuccessData | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [clienteErrors, setClienteErrors] = useState<Record<string, string>>({});
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const pdfUrlRef = useRef<string | null>(null);
-
-  // La URL de blob del PDF se revoca al cerrar el visor o desmontar el modal.
-  useEffect(() => {
-    pdfUrlRef.current = pdfUrl;
-  }, [pdfUrl]);
-  useEffect(() => () => {
-    if (pdfUrlRef.current) window.URL.revokeObjectURL(pdfUrlRef.current);
-  }, []);
 
   const sumaMontos = round2(pagos.reduce((acc, p) => acc + (p.monto || 0), 0));
   const diferencia = round2(total - sumaMontos);
@@ -182,7 +181,11 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
     }
   };
 
-  /** Emite la factura si hace falta y abre el visor embebido con el PDF. */
+  /**
+   * Emite la factura si hace falta y la muestra en el cuerpo de la página (no
+   * en un modal: un PDF de factura completa aprovecha mejor el espacio ahí).
+   * Cierra este modal de pago para dar paso a esa vista.
+   */
   const handleVerFactura = async () => {
     if (!successData) return;
     setDownloadingPdf(true);
@@ -192,9 +195,9 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
         comprobante = await billingApi.emitirComprobante(successData.pedidoId);
       }
       const url = await crearUrlFacturaPdf(successData.pedidoId);
-      if (pdfUrlRef.current) window.URL.revokeObjectURL(pdfUrlRef.current);
-      setSuccessData({ ...successData, comprobante, facturaError: undefined });
-      setPdfUrl(url);
+      const numero = comprobante.numero_comprobante ?? successData.pedidoId;
+      mostrarFacturaPdf(url, numero);
+      onClose();
     } catch (e) {
       const motivo = await extraerMotivoBilling(e);
       setSuccessData({
@@ -206,52 +209,11 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
     }
   };
 
-  const cerrarVisor = () => {
-    if (pdfUrlRef.current) window.URL.revokeObjectURL(pdfUrlRef.current);
-    setPdfUrl(null);
-  };
-
   function formatComprobante(value: string): string {
     const digits = value.replace(/\D/g, "").slice(0, 13);
     if (digits.length <= 3) return digits;
     if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
     return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  }
-
-  // ── Visor de factura embebido (sin popups: el PDF se muestra en la web) ──
-  if (successData && pdfUrl) {
-    const numero = successData.comprobante?.numero_comprobante ?? successData.pedidoId;
-    return (
-      <Dialog.Root open={true} onOpenChange={cerrarVisor}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-xl z-50 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-3xl h-[88vh] bg-surface rounded-3xl shadow-[0_12px_48px_rgba(31,27,20,0.35)] ring-1 ring-black/[0.04] z-50 flex flex-col overflow-hidden animate-slide-up">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-outline-variant/40 shrink-0">
-              <Dialog.Title className="flex items-center gap-2 text-base font-display font-bold text-primary">
-                <FileText className="w-[18px] h-[18px]" /> Factura {numero}
-              </Dialog.Title>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => descargarBlobComoArchivo(pdfUrl, `factura-${numero}.pdf`)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-secondary text-on-secondary hover:bg-secondary/90 transition-colors active:scale-95"
-                >
-                  <Download className="w-3.5 h-3.5" /> Descargar
-                </button>
-                <button
-                  onClick={cerrarVisor}
-                  className="w-8 h-8 flex items-center justify-center rounded-full text-outline hover:text-error hover:bg-error-container/40 transition-colors"
-                  aria-label="Cerrar visor"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            <Dialog.Description className="sr-only">Vista previa del PDF de la factura emitida.</Dialog.Description>
-            <iframe src={pdfUrl} title={`Factura ${numero}`} className="flex-1 w-full bg-surface-container" />
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-    );
   }
 
   // ── Pago exitoso: detalle de la factura + acciones ──
@@ -260,8 +222,8 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
     return (
       <Dialog.Root open={true} onOpenChange={onClose}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-xl z-50 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-sm bg-surface rounded-3xl shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] z-50 p-7 flex flex-col items-center animate-slide-up">
+          <Dialog.Overlay className="fixed inset-0 bg-black/30 backdrop-blur-md z-50 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+          <Dialog.Content className={`fixed top-1/2 -translate-y-1/2 ${modalCenterX} w-[calc(100%-2rem)] max-w-sm bg-surface rounded-3xl shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] z-50 p-7 flex flex-col items-center animate-slide-up`}>
             <div className="w-16 h-16 bg-secondary-container rounded-full flex items-center justify-center mb-4 shadow-inner">
               <CheckCircle2 className="w-8 h-8 text-secondary" />
             </div>
@@ -324,140 +286,155 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
   return (
     <Dialog.Root open={true} onOpenChange={onClose}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-xl z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-md bg-surface rounded-3xl shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] z-50 flex flex-col max-h-[92vh] overflow-hidden animate-slide-up">
+        <Dialog.Overlay className="fixed inset-0 bg-black/30 backdrop-blur-md z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Content className={`fixed top-1/2 -translate-y-1/2 ${modalCenterX} w-[calc(100%-2rem)] max-w-xl bg-surface rounded-3xl shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] z-50 flex flex-col max-h-[92vh] overflow-hidden animate-slide-up`}>
           {/* Header */}
-          <div className="flex items-center justify-between px-6 pt-5 pb-3 shrink-0">
-            <Dialog.Title className="text-xl font-display font-bold text-primary">Procesar Pago</Dialog.Title>
-            <Dialog.Close className="w-8 h-8 flex items-center justify-center rounded-full text-outline hover:text-error hover:bg-error-container/40 transition-colors">
+          <div className="flex items-center justify-between px-7 pt-6 pb-4 shrink-0 border-b border-outline-variant/30">
+            <div>
+              <Dialog.Title className="text-2xl font-display font-bold text-primary leading-tight">Procesar Pago</Dialog.Title>
+              <p className="text-xs text-on-surface-variant font-medium mt-0.5">Registra la factura y los métodos de pago del pedido</p>
+            </div>
+            <Dialog.Close className="w-9 h-9 flex items-center justify-center rounded-full text-outline hover:text-error hover:bg-error-container/40 transition-colors shrink-0">
               <X className="w-5 h-5" />
             </Dialog.Close>
           </div>
           <Dialog.Description className="sr-only">Registra el tipo de factura y uno o varios métodos de pago hasta cubrir el total del pedido.</Dialog.Description>
 
           {/* Total + progreso de cobertura */}
-          <div className="px-6 shrink-0">
-            <div className="bg-primary rounded-2xl px-5 py-4 text-on-primary relative overflow-hidden">
-              <div className="flex items-end justify-between relative z-10">
-                <div>
+          <div className="px-7 pt-5 shrink-0">
+            <div className="bg-primary rounded-2xl px-6 py-5 text-on-primary relative overflow-hidden">
+              <div className="flex items-end justify-between relative z-10 gap-4">
+                <div className="min-w-0">
                   <p className="text-xs font-semibold text-on-primary/70 uppercase tracking-wider">Total a cobrar</p>
-                  <p className="text-4xl font-display font-black leading-tight mt-0.5">${total.toFixed(2)}</p>
+                  <p className="text-4xl font-display font-black leading-tight mt-0.5 tabular-nums">${total.toFixed(2)}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <p className="text-xs font-semibold text-on-primary/70">Ingresado</p>
-                  <p className="text-lg font-display font-bold tabular-nums">${sumaMontos.toFixed(2)}</p>
+                  <p className="text-xl font-display font-bold tabular-nums mt-0.5">${sumaMontos.toFixed(2)}</p>
                 </div>
               </div>
-              <div className="mt-3 h-1.5 rounded-full bg-on-primary/20 overflow-hidden relative z-10">
-                <div
-                  className={`h-full rounded-full transition-all duration-300 ${isComplete ? "bg-secondary-container" : "bg-tertiary-container"}`}
-                  style={{ width: `${cubierto}%` }}
-                />
+              <div className="mt-4 flex items-center gap-2.5 relative z-10">
+                <div className="flex-1 h-1.5 rounded-full bg-on-primary/20 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${isComplete ? "bg-secondary-container" : "bg-tertiary-container"}`}
+                    style={{ width: `${cubierto}%` }}
+                  />
+                </div>
+                <span className="text-[11px] font-bold text-on-primary/80 tabular-nums shrink-0">{Math.round(cubierto)}%</span>
               </div>
             </div>
           </div>
 
           {/* Cliente + lista de pagos (scroll flexible) */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-2.5">
+          <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-7 py-5 space-y-4">
             {/* Tipo de factura */}
-            <div className="rounded-2xl bg-surface-container-low border border-outline-variant/40 p-3">
-              <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Facturar a</p>
+            <div className="rounded-2xl bg-surface-container-low border border-outline-variant/40 p-4">
+              <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-2.5">Facturar a</p>
               <ClienteFactura errors={clienteErrors} onChange={() => setClienteErrors({})} />
             </div>
 
-            <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider pt-1">Métodos de pago</p>
-            {pagos.map((pago, index) => {
-              const method = PAYMENT_METHODS.find((m) => m.id === pago.metodoPago)!;
-              const Icon = method.icon;
-              const isElectronic = ELECTRONIC_METHODS.includes(pago.metodoPago);
-              const montoErr = fieldErrors[`monto_${pago.metodoPago}`];
-              const refErr = fieldErrors[`referencia_${pago.metodoPago}`];
+            <div>
+              <div className="flex items-center justify-between mb-2.5">
+                <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Métodos de pago</p>
+                <span className="text-[11px] font-semibold text-on-surface-variant tabular-nums">
+                  {pagos.length} {pagos.length === 1 ? "método" : "métodos"}
+                </span>
+              </div>
+              <div className="space-y-3">
+                {pagos.map((pago, index) => {
+                  const method = PAYMENT_METHODS.find((m) => m.id === pago.metodoPago)!;
+                  const Icon = method.icon;
+                  const isElectronic = ELECTRONIC_METHODS.includes(pago.metodoPago);
+                  const montoErr = fieldErrors[`monto_${pago.metodoPago}`];
+                  const refErr = fieldErrors[`referencia_${pago.metodoPago}`];
 
-              return (
-                <div
-                  key={pago.metodoPago}
-                  className="rounded-2xl bg-surface-container-low border border-outline-variant/40 p-3 transition-colors hover:border-primary/30 animate-fade-in"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                      <Icon className="w-[18px] h-[18px]" />
-                    </div>
-                    <span className="font-bold text-sm text-on-surface flex-1 min-w-0 truncate">{method.name}</span>
-
-                    <div className={`flex items-center rounded-xl border bg-surface-container-lowest overflow-hidden ${montoErr ? "border-error" : "border-outline-variant/60"}`}>
-                      <span className="pl-2.5 text-sm font-bold text-on-surface-variant">$</span>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        inputMode="decimal"
-                        value={pago.monto || ""}
-                        onChange={(e) => setMonto(index, e.target.value)}
-                        placeholder="0.00"
-                        className="w-20 py-2 pr-2 pl-1 text-sm font-bold text-primary text-right tabular-nums bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                    </div>
-
-                    {pagos.length > 1 && (
-                      <button
-                        onClick={() => removePago(index)}
-                        className="w-7 h-7 flex items-center justify-center rounded-lg text-outline hover:text-error hover:bg-error-container/50 transition-colors shrink-0"
-                        title="Quitar método"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Error del monto, justo debajo de su campo */}
-                  {montoErr && (
-                    <p className="text-[11px] font-medium text-error mt-1.5 pl-[46px]">{montoErr}</p>
-                  )}
-
-                  {/* Fila secundaria: botón Resto + referencia (si aplica) */}
-                  <div className="flex items-center gap-2 mt-2 pl-[46px]">
-                    <button
-                      onClick={() => asignarResto(index)}
-                      className="flex items-center gap-1 text-[11px] font-bold text-secondary hover:text-primary transition-colors shrink-0"
-                      title="Asignar el saldo restante a este método"
+                  return (
+                    <div
+                      key={pago.metodoPago}
+                      className="rounded-2xl bg-surface-container-low border border-outline-variant/40 p-4 transition-colors hover:border-primary/30 animate-fade-in"
                     >
-                      <Sparkles className="w-3 h-3" /> Resto
-                    </button>
-                    {isElectronic && (
-                      <input
-                        type="text"
-                        value={pago.referencia_pago || ""}
-                        onChange={(e) => setReferencia(index, formatComprobante(e.target.value))}
-                        placeholder="N° de comprobante xxx-xxx-xxxxxxx"
-                        className={`flex-1 min-w-0 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-surface-container-lowest border outline-none transition-colors ${refErr ? "border-error focus:border-error" : "border-outline-variant/60 focus:border-primary"}`}
-                      />
-                    )}
-                  </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                          <Icon className="w-5 h-5" />
+                        </div>
+                        <span className="font-bold text-sm text-on-surface flex-1 min-w-0 truncate">{method.name}</span>
 
-                  {/* Error de la referencia, justo debajo de su campo */}
-                  {refErr && (
-                    <p className="text-[11px] font-medium text-error mt-1.5 pl-[46px]">{refErr}</p>
-                  )}
-                </div>
-              );
-            })}
+                        <div className={`flex items-center rounded-xl border bg-surface-container-lowest overflow-hidden shrink-0 ${montoErr ? "border-error" : "border-outline-variant/60"}`}>
+                          <span className="pl-3 text-sm font-bold text-on-surface-variant">$</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            inputMode="decimal"
+                            value={pago.monto || ""}
+                            onChange={(e) => setMonto(index, e.target.value)}
+                            placeholder="0.00"
+                            className="w-24 py-2.5 pr-3 pl-1 text-base font-bold text-primary text-right tabular-nums bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        </div>
+
+                        {pagos.length > 1 && (
+                          <button
+                            onClick={() => removePago(index)}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg text-outline hover:text-error hover:bg-error-container/50 transition-colors shrink-0"
+                            title="Quitar método"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Error del monto, justo debajo de su campo */}
+                      {montoErr && (
+                        <p className="text-[11px] font-medium text-error mt-1.5 pl-[52px]">{montoErr}</p>
+                      )}
+
+                      {/* Fila secundaria: botón Resto + referencia (si aplica) */}
+                      <div className="flex items-center gap-2.5 mt-2.5 pl-[52px]">
+                        <button
+                          onClick={() => asignarResto(index)}
+                          className="flex items-center gap-1 text-[11px] font-bold text-secondary hover:text-primary transition-colors shrink-0 px-2 py-1 -ml-2 rounded-lg hover:bg-secondary/10"
+                          title="Asignar el saldo restante a este método"
+                        >
+                          <Sparkles className="w-3 h-3" /> Resto
+                        </button>
+                        {isElectronic && (
+                          <input
+                            type="text"
+                            value={pago.referencia_pago || ""}
+                            onChange={(e) => setReferencia(index, formatComprobante(e.target.value))}
+                            placeholder="N° de comprobante xxx-xxx-xxxxxxx"
+                            className={`flex-1 min-w-0 text-xs font-medium px-3 py-1.5 rounded-lg bg-surface-container-lowest border outline-none transition-colors ${refErr ? "border-error focus:border-error" : "border-outline-variant/60 focus:border-primary"}`}
+                          />
+                        )}
+                      </div>
+
+                      {/* Error de la referencia, justo debajo de su campo */}
+                      {refErr && (
+                        <p className="text-[11px] font-medium text-error mt-1.5 pl-[52px]">{refErr}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* Agregar método */}
             {availableMethods.length > 0 && (
-              <div className="pt-1">
-                <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Agregar método de pago</p>
-                <div className="flex flex-wrap gap-2">
+              <div>
+                <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-2.5">Agregar método de pago</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {availableMethods.map((m) => {
                     const Icon = m.icon;
                     return (
                       <button
                         key={m.id}
                         onClick={() => addPago(m.id)}
-                        className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-outline-variant/70 rounded-xl bg-surface-container-lowest hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors active:scale-95"
+                        className="flex items-center gap-2 px-3 py-2.5 text-xs font-semibold border border-outline-variant/70 rounded-xl bg-surface-container-lowest hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors active:scale-95"
                       >
-                        <Plus className="w-3.5 h-3.5" />
-                        <Icon className="w-3.5 h-3.5" />
-                        {m.name}
+                        <Plus className="w-3.5 h-3.5 shrink-0" />
+                        <Icon className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{m.name}</span>
                       </button>
                     );
                   })}
@@ -467,9 +444,9 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
           </div>
 
           {/* Footer: saldo + acciones (fijo) */}
-          <div className="shrink-0 px-6 pt-3 pb-5 border-t border-outline-variant/40 bg-surface-container-lowest/60">
+          <div className="shrink-0 px-7 pt-4 pb-6 border-t border-outline-variant/40 bg-surface-container-lowest/60">
             <div
-              className={`flex items-center justify-between px-4 py-2.5 rounded-xl mb-3 text-sm font-bold transition-colors ${
+              className={`flex items-center justify-between px-4 py-3 rounded-xl mb-4 text-sm font-bold transition-colors ${
                 isComplete
                   ? "bg-secondary/10 text-secondary"
                   : diferencia < 0
@@ -484,13 +461,13 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
             </div>
 
             <div className="flex gap-3">
-              <Dialog.Close className="flex-1 py-3 font-bold text-sm text-on-surface-variant hover:bg-surface-container rounded-2xl transition-colors">
+              <Dialog.Close className="flex-1 py-3.5 font-bold text-sm text-on-surface-variant hover:bg-surface-container rounded-2xl transition-colors">
                 Cancelar
               </Dialog.Close>
               <button
                 onClick={handleCheckout}
                 disabled={loading || !isComplete}
-                className="flex-[2] bg-secondary hover:bg-secondary/90 text-on-secondary py-3 rounded-2xl font-bold text-sm shadow-md shadow-secondary/20 hover:shadow-lg transition-all disabled:opacity-40 disabled:shadow-none flex justify-center items-center gap-2 active:scale-[0.98]"
+                className="flex-[2] bg-secondary hover:bg-secondary/90 text-on-secondary py-3.5 rounded-2xl font-bold text-sm shadow-md shadow-secondary/20 hover:shadow-lg transition-all disabled:opacity-40 disabled:shadow-none flex justify-center items-center gap-2 active:scale-[0.98]"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
                 {loading ? "Procesando..." : `Cobrar $${total.toFixed(2)}`}

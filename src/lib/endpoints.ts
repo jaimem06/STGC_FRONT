@@ -11,10 +11,16 @@ export const ENDPOINTS = {
     ),
     MOVIMIENTO: "billing/facturas/movimiento",
     COMPROBANTES: {
-      // Emite (o recupera) la factura de un pedido pagado.
+      // Historial de facturas emitidas por el cajero autenticado.
+      BASE: "billing/comprobantes",
+      // Emite (o recupera/transiciona) la factura de un pedido. Sin pagar aún:
+      // BORRADOR (formal=false, por defecto) o PENDIENTE (formal=true).
       EMITIR: (pedidoId: string) => `billing/comprobantes/${pedidoId}/emitir`,
       // Descarga el PDF de la factura bajo demanda.
       PDF: (pedidoId: string) => `billing/comprobantes/${pedidoId}/pdf`,
+      // Anula o marca como reembolsada una factura ya emitida (con motivo, para auditoría).
+      ANULAR: (pedidoId: string) => `billing/comprobantes/${pedidoId}/anular`,
+      REEMBOLSAR: (pedidoId: string) => `billing/comprobantes/${pedidoId}/reembolsar`,
     },
   },
   AUTH: {
@@ -92,7 +98,8 @@ export const ENDPOINTS = {
       ANULAR: (id: string) => `pedidos/${id}/anular`,
       PAGAR: (id: string) => `pedidos/${id}/pagar`,
       COMPROBANTE: (id: string) => `pedidos/${id}/comprobante`,
-    }
+    },
+    CLIENTES: "clientes",
   },
   REPORT: {
     BASE_URL: normalizeBaseUrl(

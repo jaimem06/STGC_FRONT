@@ -5,9 +5,14 @@ import { toast } from "@/lib/notifications";
 
 export interface Product {
   id: string;
+  sku?: string;
   nombre: string;
   precioUnitario: number;
   stockActual: number;
+  /** Umbral de stock del inventario: por debajo se marca como stock bajo. */
+  stockMinimo?: number;
+  /** Estado del inventario: DISPONIBLE | STOCK_BAJO | AGOTADO. */
+  estado?: string;
   categoria: string;
   imagenUrl?: string;
 }
@@ -78,6 +83,11 @@ interface PosState {
   facturaConDatos: boolean;
   isRegisterOpen: boolean;
   loading: boolean;
+  /** URL de blob del PDF de factura a mostrar en el cuerpo de la página (no en un modal). */
+  facturaPdfUrl: string | null;
+  facturaPdfNumero: string | null;
+  mostrarFacturaPdf: (url: string, numero: string) => void;
+  cerrarFacturaPdf: () => void;
   fetchProductos: () => Promise<void>;
   fetchPedidosActivos: () => Promise<void>;
   addToCart: (producto: Product) => void;
@@ -156,6 +166,24 @@ export const usePosStore = create<PosState>((set, get) => ({
   facturaConDatos: false,
   isRegisterOpen: false,
   loading: false,
+  facturaPdfUrl: null,
+  facturaPdfNumero: null,
+
+  /**
+   * Revoca la URL de blob anterior (si la había) antes de fijar la nueva: el
+   * cajero puede ver varias facturas seguidas sin acumular URLs sin liberar.
+   */
+  mostrarFacturaPdf: (url, numero) => {
+    const anterior = get().facturaPdfUrl;
+    if (anterior) window.URL.revokeObjectURL(anterior);
+    set({ facturaPdfUrl: url, facturaPdfNumero: numero });
+  },
+
+  cerrarFacturaPdf: () => {
+    const anterior = get().facturaPdfUrl;
+    if (anterior) window.URL.revokeObjectURL(anterior);
+    set({ facturaPdfUrl: null, facturaPdfNumero: null });
+  },
 
   fetchProductos: async () => {
     set({ loading: true });
@@ -170,9 +198,12 @@ export const usePosStore = create<PosState>((set, get) => ({
       const data = await posService.getProductos();
       const mapped = data.map((p: any) => ({
         id: p.id,
+        sku: p.sku,
         nombre: p.nombre,
         precioUnitario: p.precio,
         stockActual: p.stock,
+        stockMinimo: p.stockMinimo,
+        estado: p.estado,
         categoria: p.categoria || "CAFETERÍA",
         imagenUrl: p.imagenUrl
       }));
@@ -291,7 +322,7 @@ export const usePosStore = create<PosState>((set, get) => ({
 
     set({ loading: true });
     try {
-      await posService.crearPedido({
+      const pedido = await posService.crearPedido({
         cliente_nombre: clienteNombre,
         cliente_apellido: clienteApellido,
         cliente_cedula: clienteCedula,
@@ -301,6 +332,9 @@ export const usePosStore = create<PosState>((set, get) => ({
       clearCart();
       await fetchPedidosActivos();
       set({ loading: false });
+      // Best-effort: deja un registro BORRADOR de facturación (preventa/pedido
+      // en mesa) para este pedido guardado. No bloquea el guardado si falla.
+      billingApi.emitirComprobante(pedido.id).catch(() => {});
       return true;
     } catch (error: any) {
       toast.error(error?.response?.data?.error || "Error al guardar pedido");
@@ -378,7 +412,13 @@ export const usePosStore = create<PosState>((set, get) => ({
 
       const totalBackend = Math.round((pedidoSync?.total ?? 0) * 100) / 100;
       const pagosConciliados = reconciliarPagos(pagos, totalBackend);
-      await posService.pagarPedido(pedidoId, { pagos: pagosConciliados });
+      const pagoRes = await posService.pagarPedido(pedidoId, { pagos: pagosConciliados });
+      if (pagoRes?.advertencias?.length) {
+        toast.warning(
+          "Pago registrado con advertencias de inventario",
+          pagoRes.advertencias.join(" ")
+        );
+      }
 
       // HU012: emitir la factura en el billing-service (lee el pedido pagado de
       // la BD compartida). Es best-effort: si falla, el cobro ya está hecho y la

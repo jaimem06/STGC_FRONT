@@ -19,6 +19,25 @@ export default function Cart() {
   } = usePosStore();
   const [isEditingClient, setIsEditingClient] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+  // Buffer local de edición de cantidad (por producto): permite escribir un
+  // número de golpe (p. ej. "100") en vez de pulsar "+" cien veces, sin que un
+  // estado intermedio vacío o inválido dispare updateQuantity de por medio.
+  const [cantidadEditando, setCantidadEditando] = useState<Record<string, string>>({});
+
+  const confirmarCantidad = (productoId: string) => {
+    const texto = cantidadEditando[productoId];
+    if (texto !== undefined) {
+      const parsed = parseInt(texto, 10);
+      if (texto.trim() !== "" && !isNaN(parsed) && parsed > 0) {
+        updateQuantity(productoId, parsed);
+      }
+      setCantidadEditando((prev) => {
+        const next = { ...prev };
+        delete next[productoId];
+        return next;
+      });
+    }
+  };
 
   const subtotal = roundCurrency(cart.reduce((acc, item) => acc + item.precioUnitario * item.cantidad, 0));
   const iva = roundCurrency(subtotal * IVA_RATE);
@@ -121,7 +140,19 @@ export default function Cart() {
                   >
                     <Minus className="w-3.5 h-3.5" />
                   </button>
-                  <span className="w-6 text-center text-sm font-bold text-primary tabular-nums">{item.cantidad}</span>
+                  <input
+                    type="number"
+                    min={1}
+                    inputMode="numeric"
+                    value={cantidadEditando[item.productoId] ?? item.cantidad}
+                    onChange={(e) => setCantidadEditando((prev) => ({ ...prev, [item.productoId]: e.target.value }))}
+                    onFocus={(e) => e.target.select()}
+                    onBlur={() => confirmarCantidad(item.productoId)}
+                    onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                    title="Escribe la cantidad para agregar varias unidades de una vez"
+                    aria-label={`Cantidad de ${item.nombre}`}
+                    className="w-11 text-center text-sm font-bold text-primary tabular-nums bg-transparent outline-none rounded-lg focus:ring-1 focus:ring-primary/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                   <button
                     onClick={() => updateQuantity(item.productoId, item.cantidad + 1)}
                     className="w-7 h-7 flex items-center justify-center rounded-full bg-surface text-on-surface hover:bg-primary hover:text-on-primary transition-colors active:scale-90"
