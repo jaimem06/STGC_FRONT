@@ -48,7 +48,11 @@ export default function Dialog({
                 </RadixDialog.Description>
               )}
             </div>
-            <RadixDialog.Close className="p-1.5 hover:bg-surface-container rounded-full text-outline transition-colors outline-none">
+            <RadixDialog.Close
+              aria-label="Cerrar"
+              title="Cerrar"
+              className="p-1.5 -mr-1.5 -mt-1 hover:bg-surface-container rounded-full text-outline hover:text-on-surface transition-colors outline-none shrink-0"
+            >
               <X size={18} />
             </RadixDialog.Close>
           </div>

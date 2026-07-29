@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { posService } from "@/lib/pos-service";
+import { posService, ResumenCaja, Turno } from "@/lib/pos-service";
 import { billingApi, Comprobante } from "@/lib/billing-service";
 import { toast } from "@/lib/notifications";
 
@@ -63,13 +63,8 @@ export interface Pedido {
 }
 
 interface CierreResult {
-  turno: any;
-  resumen: {
-    totalTransacciones: number;
-    montoVentasTotal: number;
-    ventas_efectivo: number;
-    desglose: Record<string, number>;
-  };
+  turno: Turno;
+  resumen: ResumenCaja;
 }
 
 interface PosState {
@@ -82,6 +77,11 @@ interface PosState {
   clienteCedula: string;
   facturaConDatos: boolean;
   isRegisterOpen: boolean;
+  /** Turno de caja abierto del cajero autenticado (null si la caja está cerrada). */
+  turno: Turno | null;
+  /** Arqueo en vivo del turno: apertura, cobrado por método y monto esperado de cierre. */
+  resumenCaja: ResumenCaja | null;
+  loadingResumen: boolean;
   loading: boolean;
   /** URL de blob del PDF de factura a mostrar en el cuerpo de la página (no en un modal). */
   facturaPdfUrl: string | null;
@@ -102,6 +102,8 @@ interface PosState {
   checkout: (pagos: PagoInput[]) => Promise<{ success: boolean; pedidoId?: string; comprobante?: Comprobante; facturaError?: string }>;
   abrirCaja: (monto: number) => Promise<boolean>;
   cerrarCaja: (monto: number) => Promise<CierreResult | null>;
+  /** Refresca el arqueo del turno abierto. Silencioso: no molesta con toasts. */
+  fetchResumenCaja: () => Promise<void>;
 }
 
 /** Datos del cliente por defecto para ventas a consumidor final. */
@@ -165,6 +167,9 @@ export const usePosStore = create<PosState>((set, get) => ({
   clienteCedula: CONSUMIDOR_FINAL.cedula,
   facturaConDatos: false,
   isRegisterOpen: false,
+  turno: null,
+  resumenCaja: null,
+  loadingResumen: false,
   loading: false,
   facturaPdfUrl: null,
   facturaPdfNumero: null,
@@ -190,7 +195,7 @@ export const usePosStore = create<PosState>((set, get) => ({
     try {
       try {
         const estadoRes = await posService.getEstadoCaja();
-        set({ isRegisterOpen: estadoRes.isRegisterOpen });
+        set({ isRegisterOpen: estadoRes.isRegisterOpen, turno: estadoRes.turno ?? null });
       } catch (e) {
         console.error("Error checking register state", e);
       }
@@ -439,6 +444,9 @@ export const usePosStore = create<PosState>((set, get) => ({
       clearCart();
       set({ pedidoEnCobro: null });
       await fetchProductos();
+      // El cobro cambia el monto con el que debe cerrarse la caja: mantenemos
+      // el arqueo al día para que el cierre nunca muestre un valor obsoleto.
+      get().fetchResumenCaja();
       set({ loading: false });
       return { success: true, pedidoId, comprobante, facturaError };
     } catch (error: any) {
@@ -451,11 +459,12 @@ export const usePosStore = create<PosState>((set, get) => ({
   abrirCaja: async (monto) => {
     set({ loading: true });
     try {
-      await posService.abrirTurno(monto);
-      set({ isRegisterOpen: true, loading: false });
+      const turno = await posService.abrirTurno(monto);
+      set({ isRegisterOpen: true, turno, loading: false });
       toast.success("Caja abierta exitosamente");
       get().fetchProductos();
       get().fetchPedidosActivos();
+      get().fetchResumenCaja();
       return true;
     } catch (error: any) {
       toast.error(error?.response?.data?.error || "Error al abrir caja");
@@ -468,17 +477,34 @@ export const usePosStore = create<PosState>((set, get) => ({
     set({ loading: true });
     try {
       const res = await posService.cerrarCaja(monto);
-      set({ isRegisterOpen: false, pedidosActivos: [], loading: false });
-      if (res.turno.estado === 'CERRADO_CON_DESCUADRE') {
-        toast.info(`Caja cerrada con descuadre. Diferencia: $${round2(res.turno.diferencia).toFixed(2)}`);
-      } else {
-        toast.success("Caja cerrada exitosamente");
-      }
+      set({ isRegisterOpen: false, turno: null, resumenCaja: null, pedidosActivos: [], loading: false });
+      toast.success("Caja cerrada y cuadrada exitosamente");
       return res;
     } catch (error: any) {
+      // El backend rechaza el cierre cuando el monto declarado no cuadra con el
+      // esperado; el mensaje ya explica la diferencia exacta.
       toast.error(error?.response?.data?.error || "Error al cerrar caja");
+      // Refrescamos el arqueo: si el desajuste venía de un cobro registrado
+      // después de abrir el modal, el cajero verá el monto correcto al instante.
+      await get().fetchResumenCaja();
       set({ loading: false });
       return null;
+    }
+  },
+
+  fetchResumenCaja: async () => {
+    set({ loadingResumen: true });
+    try {
+      const { turno, resumen } = await posService.getResumenCaja();
+      set({ turno, resumenCaja: resumen, isRegisterOpen: true, loadingResumen: false });
+    } catch (e: any) {
+      // 400 = no hay turno abierto: no es un error que el cajero deba ver.
+      if (e?.response?.status === 400) {
+        set({ isRegisterOpen: false, turno: null, resumenCaja: null });
+      } else {
+        console.error("Error cargando el resumen de caja", e);
+      }
+      set({ loadingResumen: false });
     }
   }
 }));

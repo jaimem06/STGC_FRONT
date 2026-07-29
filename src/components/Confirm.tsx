@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
-import { AlertCircle, Trash2, CheckCircle2 } from "lucide-react";
+import { AlertCircle, Trash2, CheckCircle2, X } from "lucide-react";
 
 interface ConfirmProps {
   open: boolean;
@@ -39,6 +39,17 @@ export default function Confirm({
       <AlertDialogPrimitive.Portal>
         <AlertDialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-xl animate-in fade-in duration-300" />
         <AlertDialogPrimitive.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] w-full max-w-md bg-surface rounded-[40px] p-8 shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] border border-outline-variant/20 animate-in zoom-in-95 duration-200">
+          {/* Escape visible: además de CANCELAR, un botón de cierre en la esquina */}
+          <AlertDialogPrimitive.Cancel asChild>
+            <button
+              aria-label="Cerrar"
+              title="Cerrar"
+              className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full text-outline hover:bg-surface-container hover:text-on-surface transition-colors outline-none"
+            >
+              <X size={18} />
+            </button>
+          </AlertDialogPrimitive.Cancel>
+
           <div className="flex flex-col items-center text-center">
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 shadow-sm ${
               variant === "danger" ? "bg-error/10 text-error" : 

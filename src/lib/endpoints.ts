@@ -91,6 +91,9 @@ export const ENDPOINTS = {
       APERTURA: "caja/apertura",
       CIERRE: "caja/cierre",
       ESTADO: "caja/estado",
+      // Resumen en vivo del turno abierto: apertura, cobrado por método de
+      // pago y monto con el que debe cerrarse la caja.
+      RESUMEN: "caja/resumen",
     },
     PEDIDOS: {
       BASE: "pedidos",

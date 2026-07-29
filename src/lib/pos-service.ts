@@ -19,12 +19,18 @@ export const posService = {
     return res.data;
   },
 
-  getEstadoCaja: async () => {
+  getEstadoCaja: async (): Promise<{ isRegisterOpen: boolean; turno: Turno | null }> => {
     const res = await api.get(ENDPOINTS.POS_SERVICE.CAJA.ESTADO);
     return res.data;
   },
 
-  abrirTurno: async (montoApertura: number) => {
+  /** Resumen en vivo del turno abierto (apertura, cobrado y monto esperado de cierre). */
+  getResumenCaja: async (): Promise<{ turno: Turno; resumen: ResumenCaja }> => {
+    const res = await api.get(ENDPOINTS.POS_SERVICE.CAJA.RESUMEN);
+    return res.data;
+  },
+
+  abrirTurno: async (montoApertura: number): Promise<Turno> => {
     const res = await api.post(ENDPOINTS.POS_SERVICE.CAJA.APERTURA, { montoApertura });
     return res.data;
   },
@@ -94,6 +100,33 @@ export const posService = {
     return res.data;
   },
 };
+
+/** Turno de caja tal como lo devuelve el pos-service. */
+export interface Turno {
+  id: string;
+  usuarioId: string;
+  fechaApertura: string;
+  fechaCierre: string | null;
+  montoApertura: number;
+  montoCierreFisico: number | null;
+  montoCierreSistema: number | null;
+  diferencia: number | null;
+  estado: string;
+}
+
+/**
+ * Arqueo del turno. `montoCierreEsperado` = apertura + todo lo cobrado en el
+ * turno (efectivo, tarjetas, transferencias y billeteras), que es el valor
+ * exacto con el que debe cerrarse la caja.
+ */
+export interface ResumenCaja {
+  totalTransacciones: number;
+  montoVentasTotal: number;
+  ventas_efectivo: number;
+  desglose: Record<string, number>;
+  montoApertura: number;
+  montoCierreEsperado: number;
+}
 
 export interface ClienteSugerido {
   id: string;

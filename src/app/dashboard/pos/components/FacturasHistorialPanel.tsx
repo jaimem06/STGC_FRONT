@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { usePosStore } from "@/store/posStore";
-import { billingApi, ComprobanteResumen, EstadoFactura, crearUrlFacturaPdf } from "@/lib/billing-service";
+import { billingApi, ComprobanteResumen, EstadoFactura, crearUrlFacturaPdf, rangoDeHoy } from "@/lib/billing-service";
 import { toast } from "@/lib/notifications";
-import { X, Receipt, Search, FileText, Loader2, Ban, RotateCcw, Info, CreditCard } from "lucide-react";
+import { X, Receipt, Search, FileText, Loader2, Ban, RotateCcw, Info, CreditCard, CalendarDays } from "lucide-react";
 
 interface FacturasHistorialPanelProps {
   onClose: () => void;
@@ -56,9 +56,18 @@ function MotivoDialog({ accion, onCancel, onConfirm, loading }: {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/30 backdrop-blur-md z-[110]" />
         <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-sm bg-surface rounded-3xl shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] z-[110] p-6 animate-slide-up">
-          <Dialog.Title className="text-lg font-display font-bold text-primary mb-1">
-            {esAnular ? "Anular factura" : "Marcar como reembolsada"}
-          </Dialog.Title>
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <Dialog.Title className="text-lg font-display font-bold text-primary">
+              {esAnular ? "Anular factura" : "Marcar como reembolsada"}
+            </Dialog.Title>
+            <Dialog.Close
+              aria-label="Cerrar"
+              disabled={loading}
+              className="p-1.5 -mr-1.5 -mt-1 rounded-full text-outline hover:bg-surface-container hover:text-on-surface transition-colors shrink-0 disabled:opacity-40"
+            >
+              <X className="w-5 h-5" />
+            </Dialog.Close>
+          </div>
           <Dialog.Description className="text-sm text-on-surface-variant mb-4">
             {esAnular
               ? `Factura ${accion.comprobante.numero_comprobante}: se invalida el monto, pero queda el registro para auditoría.`
@@ -99,10 +108,14 @@ function MotivoDialog({ accion, onCancel, onConfirm, loading }: {
 }
 
 /**
- * Historial de facturación del cajero autenticado (no de todos los cajeros):
- * cubre el ciclo de vida completo de la factura -- ver el PDF de lo ya
- * cobrado, y anular/reembolsar según el estado -- sin depender de haberla
- * dejado abierta en el momento del cobro.
+ * Facturación del día del cajero autenticado (no de todos los cajeros ni de
+ * jornadas anteriores): cubre el ciclo de vida completo de la factura -- ver
+ * el PDF de lo ya cobrado, y anular/reembolsar según el estado -- sin depender
+ * de haberla dejado abierta en el momento del cobro.
+ *
+ * El corte por día se calcula en la zona horaria del navegador y se aplica en
+ * el backend, de modo que el conteo total y la paginación también quedan
+ * acotados a la jornada en curso.
  */
 export default function FacturasHistorialPanel({ onClose }: FacturasHistorialPanelProps) {
   const { mostrarFacturaPdf, fetchPedidosActivos, loadPedidoForCheckout } = usePosStore();
@@ -120,7 +133,10 @@ export default function FacturasHistorialPanel({ onClose }: FacturasHistorialPan
   const cargar = async (query: string, offset: number, append: boolean) => {
     (append ? setLoadingMore : setLoading)(true);
     try {
-      const res = await billingApi.listarMisComprobantes({ q: query || undefined, limit: PAGE_SIZE, offset });
+      // El rango se recalcula en cada carga: si la jornada cambia con el panel
+      // abierto (turnos que cruzan la medianoche), el listado sigue el día real.
+      const { desde, hasta } = rangoDeHoy();
+      const res = await billingApi.listarMisComprobantes({ q: query || undefined, desde, hasta, limit: PAGE_SIZE, offset });
       setComprobantes((prev) => (append ? [...prev, ...res.comprobantes] : res.comprobantes));
       setTotal(res.total);
     } catch (error: any) {
@@ -202,12 +218,22 @@ export default function FacturasHistorialPanel({ onClose }: FacturasHistorialPan
 
   return (
     <div className="flex flex-col h-full bg-surface-container-lowest">
-      <div className="p-4 border-b border-outline-variant flex items-center justify-between">
-        <h2 className="font-display font-bold text-lg text-on-surface flex items-center gap-2">
-          <Receipt className="w-5 h-5" />
-          Mis Facturas
-        </h2>
-        <button onClick={onClose} className="text-outline hover:text-error transition-colors">
+      <div className="p-4 border-b border-outline-variant flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="font-display font-bold text-lg text-on-surface flex items-center gap-2">
+            <Receipt className="w-5 h-5" />
+            Mis Facturas de Hoy
+          </h2>
+          <p className="text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5">
+            <CalendarDays className="w-3 h-3 shrink-0" />
+            {new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
+          </p>
+        </div>
+        <button
+          onClick={onClose}
+          aria-label="Cerrar panel de facturas"
+          className="p-1.5 -mr-1.5 -mt-1 rounded-full text-outline hover:bg-surface-container hover:text-on-surface transition-colors shrink-0"
+        >
           <X className="w-5 h-5" />
         </button>
       </div>
@@ -217,7 +243,7 @@ export default function FacturasHistorialPanel({ onClose }: FacturasHistorialPan
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline" />
           <input
             type="search"
-            placeholder="Buscar por cliente, cédula o N° de factura..."
+            placeholder="Buscar entre las facturas de hoy..."
             value={q}
             onChange={(e) => buscar(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none bg-surface"
@@ -232,7 +258,7 @@ export default function FacturasHistorialPanel({ onClose }: FacturasHistorialPan
           </div>
         ) : comprobantes.length === 0 ? (
           <div className="text-center py-12 text-on-surface-variant font-medium">
-            {q ? "No se encontraron facturas con esa búsqueda" : "Todavía no has emitido ninguna factura"}
+            {q ? "No se encontraron facturas de hoy con esa búsqueda" : "Todavía no has emitido facturas hoy"}
           </div>
         ) : (
           <>
