@@ -298,7 +298,12 @@ export default function OrdersPanel({ onClose }: OrdersPanelProps) {
           <ShoppingBag className="w-5 h-5" />
           Pedidos en Edición
         </h2>
-        <button onClick={onClose} className="text-outline hover:text-error transition-colors">
+        <button
+          onClick={onClose}
+          aria-label="Cerrar panel de pedidos"
+          title="Cerrar"
+          className="p-1.5 -mr-1.5 rounded-full text-outline hover:bg-surface-container hover:text-on-surface transition-colors shrink-0"
+        >
           <X className="w-5 h-5" />
         </button>
       </div>

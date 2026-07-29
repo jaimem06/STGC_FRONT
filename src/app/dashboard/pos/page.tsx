@@ -21,6 +21,7 @@ export default function PosPage() {
   const {
     fetchProductos, fetchPedidosActivos, loading, isRegisterOpen, cart,
     facturaPdfUrl, facturaPdfNumero, cerrarFacturaPdf,
+    turno, resumenCaja, fetchResumenCaja,
   } = usePosStore();
   const [modalType, setModalType] = useState<ModalType>(null);
   const [rightPanel, setRightPanel] = useState<RightPanel>("cart");
@@ -33,8 +34,11 @@ export default function PosPage() {
   useEffect(() => {
     if (isRegisterOpen) {
       fetchPedidosActivos();
+      // Arqueo del turno: el cajero ve en todo momento con cuánto abrió y con
+      // cuánto debe cerrar, sin tener que abrir el modal de cierre.
+      fetchResumenCaja();
     }
-  }, [isRegisterOpen, fetchPedidosActivos]);
+  }, [isRegisterOpen, fetchPedidosActivos, fetchResumenCaja]);
 
   // Si el cajero navega fuera del POS mientras ve una factura, liberamos el
   // blob y limpiamos el estado: al volver no debe reaparecer una factura vieja.
@@ -100,7 +104,7 @@ export default function PosPage() {
           </div>
           <h1 className="text-2xl sm:text-3xl font-display font-bold text-primary mb-3">Caja Cerrada</h1>
           <p className="text-on-surface-variant mb-8 max-w-md text-sm sm:text-base">
-            Para comenzar a registrar ventas, debes realizar la apertura de caja indicando el monto inicial en efectivo.
+            Para comenzar a registrar ventas, debes realizar la apertura de caja indicando el monto base con el que inicias el turno.
           </p>
           <button
             onClick={() => setModalType("OPEN")}
@@ -114,12 +118,43 @@ export default function PosPage() {
         <div className="flex flex-col lg:h-[calc(100vh-6rem)]">
           {/* Header */}
           <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
-            <h1 className="text-xl sm:text-2xl font-display font-bold text-on-surface">Punto de Venta</h1>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-display font-bold text-on-surface">Punto de Venta</h1>
+              {/* Arqueo siempre visible: con cuánto se abrió y con cuánto cierra */}
+              {(turno || resumenCaja) && (
+                <p className="text-xs text-on-surface-variant mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span>
+                    Apertura:{" "}
+                    <span className="font-bold text-on-surface tabular-nums">
+                      ${(resumenCaja?.montoApertura ?? turno?.montoApertura ?? 0).toFixed(2)}
+                    </span>
+                  </span>
+                  {resumenCaja && (
+                    <>
+                      <span className="text-outline-variant">·</span>
+                      <span>
+                        Cobrado:{" "}
+                        <span className="font-bold text-on-surface tabular-nums">
+                          ${resumenCaja.montoVentasTotal.toFixed(2)}
+                        </span>
+                      </span>
+                      <span className="text-outline-variant">·</span>
+                      <span>
+                        Cierre esperado:{" "}
+                        <span className="font-bold text-primary tabular-nums">
+                          ${resumenCaja.montoCierreEsperado.toFixed(2)}
+                        </span>
+                      </span>
+                    </>
+                  )}
+                </p>
+              )}
+            </div>
             <div className="flex gap-2">
               {(
                 [
                   { panel: "orders", icon: ClipboardList, full: "Pedidos Activos", short: "Pedidos" },
-                  { panel: "facturas", icon: Receipt, full: "Mis Facturas", short: "Facturas" },
+                  { panel: "facturas", icon: Receipt, full: "Facturas de Hoy", short: "Facturas" },
                 ] as const
               ).map(({ panel, icon: Icon, full, short }) => {
                 const activo = rightPanel === panel;
@@ -236,7 +271,7 @@ export default function PosPage() {
                     mobilePanel === "facturas" ? "bg-surface text-primary shadow-sm" : "text-on-surface-variant"
                   }`}
                 >
-                  Facturas
+                  Facturas de hoy
                 </button>
               </div>
               <button

@@ -71,6 +71,17 @@ export default function SalesReport() {
     if (subView !== "detalle") loadAnalytics();
   }, [subView, loadAnalytics]);
 
+  // El drill-down no usa Radix (es un portal propio): la tecla Escape se
+  // gestiona a mano para que se cierre como cualquier otro modal de la app.
+  useEffect(() => {
+    if (!selectedEmployee) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedEmployee(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedEmployee]);
+
   // El backend ignora los filtros de fecha en /reports/sales, por eso el
   // detalle se filtra en el cliente para que el rango sea funcional.
   const filteredSales = useMemo(() => {
@@ -302,7 +313,9 @@ export default function SalesReport() {
               </div>
               <button
                 onClick={() => setSelectedEmployee(null)}
-                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface-container-high text-on-surface-variant transition-colors"
+                aria-label="Cerrar detalle"
+                title="Cerrar"
+                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface-container-high text-on-surface-variant transition-colors shrink-0"
               >
                 <X size={18} />
               </button>

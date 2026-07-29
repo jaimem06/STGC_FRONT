@@ -44,8 +44,15 @@ export const billingApi = {
     return billingInstance.post(BILLING.MOVIMIENTO, data);
   },
 
-  /** Historial de facturas emitidas por el cajero autenticado (propio, no de todos). */
-  listarMisComprobantes: async (params: { q?: string; limit?: number; offset?: number } = {}): Promise<ComprobantesListResponse> => {
+  /**
+   * Historial de facturas emitidas por el cajero autenticado (propio, no de
+   * todos). `desde`/`hasta` acotan el rango por fecha de cobro (o de creación
+   * si la factura aún no se ha cobrado); el POS los usa para mostrar
+   * únicamente la jornada en curso.
+   */
+  listarMisComprobantes: async (
+    params: { q?: string; desde?: string; hasta?: string; limit?: number; offset?: number } = {}
+  ): Promise<ComprobantesListResponse> => {
     const res = await billingInstance.get<ComprobantesListResponse>(BILLING.COMPROBANTES.BASE, { params });
     return res.data;
   },
@@ -85,6 +92,19 @@ export const billingApi = {
     const res = await billingInstance.post<Comprobante>(BILLING.COMPROBANTES.REEMBOLSAR(pedidoId), { motivo });
     return res.data;
   },
+};
+
+/**
+ * Límites del día en curso (de 00:00 a 24:00 en la zona horaria del navegador)
+ * como instantes ISO, listos para los parámetros `desde`/`hasta` del listado
+ * de comprobantes.
+ */
+export const rangoDeHoy = (): { desde: string; hasta: string } => {
+  const inicio = new Date();
+  inicio.setHours(0, 0, 0, 0);
+  const fin = new Date(inicio);
+  fin.setDate(fin.getDate() + 1);
+  return { desde: inicio.toISOString(), hasta: fin.toISOString() };
 };
 
 /**

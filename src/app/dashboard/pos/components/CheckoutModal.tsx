@@ -224,6 +224,12 @@ export default function CheckoutModal({ total, onClose }: CheckoutModalProps) {
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/30 backdrop-blur-md z-50 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
           <Dialog.Content className={`fixed top-1/2 -translate-y-1/2 ${modalCenterX} w-[calc(100%-2rem)] max-w-sm bg-surface rounded-3xl shadow-[0_12px_48px_rgba(31,27,20,0.28)] ring-1 ring-black/[0.04] z-50 p-7 flex flex-col items-center animate-slide-up`}>
+            <Dialog.Close
+              aria-label="Cerrar"
+              className="absolute top-3 right-3 w-9 h-9 flex items-center justify-center rounded-full text-outline hover:bg-surface-container hover:text-on-surface transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </Dialog.Close>
             <div className="w-16 h-16 bg-secondary-container rounded-full flex items-center justify-center mb-4 shadow-inner">
               <CheckCircle2 className="w-8 h-8 text-secondary" />
             </div>
